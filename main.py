@@ -536,7 +536,7 @@ def parse_function_calls_xml(xml_string: str, trigger_signal: str) -> Optional[L
         args_block_match = re.search(r"<args>([\s\S]*?)</args>", block)
         if args_block_match:
             args_content = args_block_match.group(1)
-            arg_matches = re.findall(r"<(\w+)>(.*?)</\1>", args_content)
+            arg_matches = re.findall(r"<(\w+)>([\s\S]*?)</\1>", args_content)
             args = dict(arg_matches)
         
         result = {"name": name, "args": args}
@@ -686,7 +686,9 @@ async def chat_completions(
         
         request_body_dict = body.model_dump(exclude_unset=True)
         request_body_dict["messages"] = processed_messages
-        has_function_call = False
+        is_fc_enabled = app_config.features.enable_function_calling
+        has_tools_in_request = bool(body.tools)
+        has_function_call = is_fc_enabled and has_tools_in_request
         trigger_signal = None
         
         print(f"🔧 [DEBUG] Request body constructed, message count: {len(processed_messages)}")
@@ -708,9 +710,7 @@ async def chat_completions(
             }
         )
 
-    if body.tools:
-        has_function_call = True
-        
+    if has_function_call:
         trigger_signal = generate_random_trigger_signal()
         print(f"🔧 [DEBUG] Generated trigger signal for this request: {trigger_signal}")
         
@@ -723,7 +723,15 @@ async def chat_completions(
         system_message = {"role": "system", "content": function_prompt}
         request_body_dict["messages"].insert(0, system_message)
         
-        del request_body_dict["tools"]
+        if "tools" in request_body_dict:
+            del request_body_dict["tools"]
+        if "tool_choice" in request_body_dict:
+            del request_body_dict["tool_choice"]
+
+    elif has_tools_in_request and not is_fc_enabled:
+        print(f"🔧 [INFO] Function calling is disabled by configuration, ignoring 'tools' and 'tool_choice' in request.")
+        if "tools" in request_body_dict:
+            del request_body_dict["tools"]
         if "tool_choice" in request_body_dict:
             del request_body_dict["tool_choice"]
 
@@ -1018,7 +1026,6 @@ def read_root():
             "models_count": len(MODEL_TO_SERVICE_MAPPING),
             "features": {
                 "function_calling": app_config.features.enable_function_calling,
-                "streaming": app_config.features.enable_streaming,
                 "logging": app_config.features.enable_logging,
                 "convert_developer_to_system": app_config.features.convert_developer_to_system,
                 "random_trigger": True

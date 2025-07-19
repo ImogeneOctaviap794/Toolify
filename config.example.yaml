@@ -40,7 +40,6 @@ client_authentication:
 # Feature configuration
 features:
   enable_function_calling: true  # Enable function calling feature
-  enable_streaming: true         # Enable streaming responses
   enable_logging: true           # Enable logging
   convert_developer_to_system: true  # Whether to convert the developer role to the system role
 

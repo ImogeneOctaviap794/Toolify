@@ -59,7 +59,6 @@ class ClientAuthConfig(BaseModel):
 class FeaturesConfig(BaseModel):
     """Feature configuration"""
     enable_function_calling: bool = Field(default=True, description="Enable function calling")
-    enable_streaming: bool = Field(default=True, description="Enable streaming responses")
     enable_logging: bool = Field(default=True, description="Enable logging")
     convert_developer_to_system: bool = Field(default=True, description="Convert developer role to system role")
 
@@ -183,7 +182,6 @@ class ConfigLoader:
         """Get feature configuration"""
         return {
             "function_calling": self.config.features.enable_function_calling,
-            "streaming": self.config.features.enable_streaming,
             "logging": self.config.features.enable_logging,
             "convert_developer_to_system": self.config.features.convert_developer_to_system
         }
