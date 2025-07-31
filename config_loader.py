@@ -81,20 +81,30 @@ class AppConfig(BaseModel):
         if len(default_services) > 1:
             raise ValueError('Only one upstream service can be marked as default')
         
-        all_models = []
+        all_models = set()
+        all_aliases = set()
+        
         for service in v:
-            all_models.extend(service.models)
-        
-        duplicates = []
-        seen = set()
-        for model in all_models:
-            if model in seen:
-                duplicates.append(model)
-            seen.add(model)
-        
-        if duplicates:
-            raise ValueError(f'Duplicate models found: {duplicates}')
-        
+            for model in service.models:
+                if model in all_models:
+                    raise ValueError(f'Duplicate model entry found: {model}')
+                all_models.add(model)
+                
+                if ':' in model:
+                    parts = model.split(':', 1)
+                    if len(parts) == 2:
+                        alias, real_model = parts
+                        if not alias.strip() or not real_model.strip():
+                            raise ValueError(f"Invalid alias format in '{model}'. Both parts must not be empty.")
+                        all_aliases.add(alias)
+                    else:
+                        raise ValueError(f"Invalid model format with colon: {model}")
+
+        regular_models = {m for m in all_models if ':' not in m}
+        conflicts = all_aliases.intersection(regular_models)
+        if conflicts:
+            raise ValueError(f"Alias names {conflicts} conflict with model names.")
+                
         return v
 
 
@@ -137,10 +147,11 @@ class ConfigLoader:
             self.load_config()
         return self._config
     
-    def get_model_to_service_mapping(self) -> Dict[str, Dict[str, Any]]:
-        """Get model to service mapping"""
+    def get_model_to_service_mapping(self) -> tuple[Dict[str, Dict[str, Any]], Dict[str, List[str]]]:
+        """Get model to service mapping and model aliases"""
         config = self.config
         model_mapping = {}
+        alias_mapping = {}
         
         for service in config.upstream_services:
             service_info = {
@@ -151,10 +162,17 @@ class ConfigLoader:
                 "is_default": service.is_default
             }
             
-            for model in service.models:
-                model_mapping[model] = service_info
+            for model_entry in service.models:
+                model_mapping[model_entry] = service_info
+                if ':' in model_entry:
+                    parts = model_entry.split(':', 1)
+                    if len(parts) == 2:
+                        alias, _ = parts
+                        if alias not in alias_mapping:
+                            alias_mapping[alias] = []
+                        alias_mapping[alias].append(model_entry)
         
-        return model_mapping
+        return model_mapping, alias_mapping
     
     def get_default_service(self) -> Dict[str, Any]:
         """Get default service configuration"""

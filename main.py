@@ -7,6 +7,7 @@ import secrets
 import string
 import traceback
 import time
+import random
 import threading
 from typing import List, Dict, Any, Optional, Literal, Union
 from collections import OrderedDict
@@ -23,11 +24,13 @@ try:
     print(f"📊 Configured {len(app_config.upstream_services)} upstream services")
     print(f"🔑 Configured {len(app_config.client_authentication.allowed_keys)} client keys")
     
-    MODEL_TO_SERVICE_MAPPING = config_loader.get_model_to_service_mapping()
+    MODEL_TO_SERVICE_MAPPING, ALIAS_MAPPING = config_loader.get_model_to_service_mapping()
     DEFAULT_SERVICE = config_loader.get_default_service()
     ALLOWED_CLIENT_KEYS = config_loader.get_allowed_client_keys()
     
     print(f"🎯 Configured {len(MODEL_TO_SERVICE_MAPPING)} model mappings")
+    if ALIAS_MAPPING:
+        print(f"🔄 Configured {len(ALIAS_MAPPING)} model aliases: {list(ALIAS_MAPPING.keys())}")
     print(f"🔄 Default service: {DEFAULT_SERVICE['name']}")
     
 except Exception as e:
@@ -546,19 +549,33 @@ def parse_function_calls_xml(xml_string: str, trigger_signal: str) -> Optional[L
     print(f"🔧 [DEBUG] Final parsing result: {results}")
     return results if results else None
 
-def find_upstream(model_name: str) -> Dict[str, Any]:
-    """Find upstream configuration by model name."""
-    if model_name in MODEL_TO_SERVICE_MAPPING:
-        service = MODEL_TO_SERVICE_MAPPING[model_name]
+def find_upstream(model_name: str) -> tuple[Dict[str, Any], str]:
+    """Find upstream configuration by model name, handling aliases."""
+    
+    chosen_model_entry = model_name
+    
+    if model_name in ALIAS_MAPPING:
+        chosen_model_entry = random.choice(ALIAS_MAPPING[model_name])
+        print(f"🔄 Model alias '{model_name}' detected. Randomly selected '{chosen_model_entry}' for this request.")
+
+    service = MODEL_TO_SERVICE_MAPPING.get(chosen_model_entry)
+    
+    if service:
         if not service.get("api_key"):
-            raise HTTPException(status_code=500, detail="Model configuration error: API key not found.")
-        return service
-    
-    if not DEFAULT_SERVICE.get("api_key"):
-        raise HTTPException(status_code=500, detail="Service configuration error: Default API key not found.")
-    
-    print(f"⚠️  Model '{model_name}' not found in configuration, using default service")
-    return DEFAULT_SERVICE
+            raise HTTPException(status_code=500, detail=f"Model configuration error: API key not found for service '{service.get('name')}'.")
+    else:
+        print(f"⚠️  Model '{model_name}' not found in configuration, using default service")
+        service = DEFAULT_SERVICE
+        if not service.get("api_key"):
+            raise HTTPException(status_code=500, detail="Service configuration error: Default API key not found.")
+
+    actual_model_name = chosen_model_entry
+    if ':' in chosen_model_entry:
+         parts = chosen_model_entry.split(':', 1)
+         if len(parts) == 2:
+             _, actual_model_name = parts
+            
+    return service, actual_model_name
 
 app = FastAPI()
 http_client = httpx.AsyncClient()
@@ -674,7 +691,7 @@ async def chat_completions(
         print(f"🔧 [DEBUG] Number of tools: {len(body.tools) if body.tools else 0}")
         print(f"🔧 [DEBUG] Streaming: {body.stream}")
         
-        upstream = find_upstream(body.model)
+        upstream, actual_model = find_upstream(body.model)
         upstream_url = f"{upstream['base_url']}/chat/completions"
         
         print(f"🔧 [DEBUG] Starting message preprocessing, original message count: {len(body.messages)}")
@@ -685,6 +702,7 @@ async def chat_completions(
             print(f"❌ [ERROR] Message structure validation failed, but continuing processing")
         
         request_body_dict = body.model_dump(exclude_unset=True)
+        request_body_dict["model"] = actual_model
         request_body_dict["messages"] = processed_messages
         is_fc_enabled = app_config.features.enable_function_calling
         has_tools_in_request = bool(body.tools)
@@ -1036,15 +1054,27 @@ def read_root():
 @app.get("/v1/models")
 async def list_models(_api_key: str = Depends(verify_api_key)):
     """List all available models"""
+    visible_models = set()
+    for model_name in MODEL_TO_SERVICE_MAPPING.keys():
+        if ':' in model_name:
+            parts = model_name.split(':', 1)
+            if len(parts) == 2:
+                alias, _ = parts
+                visible_models.add(alias)
+            else:
+                visible_models.add(model_name)
+        else:
+            visible_models.add(model_name)
+
     models = []
-    for model_name, service in MODEL_TO_SERVICE_MAPPING.items():
+    for model_id in sorted(visible_models):
         models.append({
-            "id": model_name,
+            "id": model_id,
             "object": "model",
             "created": 1677610602,
             "owned_by": "openai",
             "permission": [],
-            "root": model_name,
+            "root": model_id,
             "parent": None
         })
     

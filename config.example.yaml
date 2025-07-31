@@ -28,6 +28,10 @@ upstream_services:
     description: "Google Gemini Service"
     is_default: false
     models:
+      # Use alias "gemini-2.5" to randomly select one of the following models
+      - "gemini-2.5:gemini-2.5-pro"
+      - "gemini-2.5:gemini-2.5-flash"
+      # You can also define models that can be used directly
       - "gemini-2.5-pro"
       - "gemini-2.5-flash"
 
