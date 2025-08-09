@@ -1,7 +1,26 @@
+# Toolify: Empower any LLM with function calling capabilities.
+# Copyright (C) 2025 FunnyCups (https://github.com/funnycups)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# Project home: https://github.com/funnycups/Toolify
+# Project introduction: https://www.cups.moe/archives/toolify.html
+
 import os
 import yaml
-from typing import List, Dict, Any, Set
-from pydantic import BaseModel, Field, validator
+from typing import List, Dict, Any, Set, Optional
+from pydantic import BaseModel, Field, field_validator
 
 
 class ServerConfig(BaseModel):
@@ -20,19 +39,19 @@ class UpstreamService(BaseModel):
     description: str = Field(default="", description="Service description")
     is_default: bool = Field(default=False, description="Is default service")
     
-    @validator('base_url')
+    @field_validator('base_url')
     def validate_base_url(cls, v):
         if not v.startswith(('http://', 'https://')):
             raise ValueError('base_url must start with http:// or https://')
         return v.rstrip('/')
     
-    @validator('api_key')
+    @field_validator('api_key')
     def validate_api_key(cls, v):
         if not v or v.strip() == "":
             raise ValueError('api_key cannot be empty')
         return v
     
-    @validator('models')
+    @field_validator('models')
     def validate_models(cls, v):
         if not v or len(v) == 0:
             raise ValueError('models list cannot be empty')
@@ -46,7 +65,7 @@ class ClientAuthConfig(BaseModel):
     """Client authentication configuration"""
     allowed_keys: List[str] = Field(description="List of allowed client API keys")
     
-    @validator('allowed_keys')
+    @field_validator('allowed_keys')
     def validate_allowed_keys(cls, v):
         if not v or len(v) == 0:
             raise ValueError('allowed_keys cannot be empty')
@@ -61,6 +80,14 @@ class FeaturesConfig(BaseModel):
     enable_function_calling: bool = Field(default=True, description="Enable function calling")
     enable_logging: bool = Field(default=True, description="Enable logging")
     convert_developer_to_system: bool = Field(default=True, description="Convert developer role to system role")
+    prompt_template: Optional[str] = Field(default=None, description="Custom prompt template for function calling")
+
+    @field_validator('prompt_template')
+    def validate_prompt_template(cls, v):
+        if v:
+            if "{tools_list}" not in v or "{trigger_signal}" not in v:
+                raise ValueError("prompt_template must contain {tools_list} and {trigger_signal} placeholders")
+        return v
 
 
 class AppConfig(BaseModel):
@@ -70,7 +97,7 @@ class AppConfig(BaseModel):
     client_authentication: ClientAuthConfig = Field(description="Client authentication configuration")
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     
-    @validator('upstream_services')
+    @field_validator('upstream_services')
     def validate_upstream_services(cls, v):
         if not v or len(v) == 0:
             raise ValueError('upstream_services cannot be empty')

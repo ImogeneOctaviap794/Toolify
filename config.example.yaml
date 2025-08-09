@@ -1,4 +1,4 @@
-# OpenAI Function Call Middleware Configuration Example File
+# Toolify Configuration Example File
 # Please copy this file as config.yaml and modify the configuration according to your actual needs
 
 # Server configuration
@@ -46,6 +46,20 @@ features:
   enable_function_calling: true  # Enable function calling feature
   enable_logging: true           # Enable logging
   convert_developer_to_system: true  # Whether to convert the developer role to the system role
+  # prompt_template: |             # [Optional] Custom function calling prompt template. If not set, the default template will be used.
+  #   You have a list of tools:
+  #   {tools_list}                 # Placeholder for the list of tools
+  #
+  #   To call a tool, use the following format, starting with the trigger signal on a new line:
+  #   {trigger_signal}             # Trigger signal to start function calling
+  #   <function_calls>
+  #     <function_call>
+  #       <tool>tool_name</tool>
+  #       <args>
+  #         <key>value</key>
+  #       </args>
+  #     </function_call>
+  #   </function_calls>
 
 # Configuration explanation:
 # 1. upstream_services: Configure multiple OpenAI compatible API services
