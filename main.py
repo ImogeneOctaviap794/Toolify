@@ -16,14 +16,21 @@ import random
 import threading
 import logging
 import tiktoken
+import yaml
 from typing import List, Dict, Any, Optional, Literal, Union
 from collections import OrderedDict
 
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 
 from config_loader import config_loader
+from admin_auth import (
+    LoginRequest, LoginResponse, verify_admin_token,
+    verify_password, create_access_token, get_admin_credentials
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,35 +165,51 @@ def generate_random_trigger_signal() -> str:
     random_str = ''.join(secrets.choice(chars) for _ in range(4))
     return f"<Function_{random_str}_Start/>"
 
-try:
-    app_config = config_loader.load_config()
-    
+def load_runtime_config(reload: bool = False):
+    """Load or reload runtime configuration and derived globals."""
+    global app_config, MODEL_TO_SERVICE_MAPPING, ALIAS_MAPPING, DEFAULT_SERVICE
+    global ALLOWED_CLIENT_KEYS, GLOBAL_TRIGGER_SIGNAL
+
+    if reload:
+        app_config = config_loader.reload_config()
+        logger.info("🔄 Reloaded configuration from disk")
+    else:
+        app_config = config_loader.load_config()
+
     log_level_str = app_config.features.log_level
     if log_level_str == "DISABLED":
         log_level = logging.CRITICAL + 1
     else:
         log_level = getattr(logging, log_level_str, logging.INFO)
-    
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
+
+    # Configure logging (avoid adding duplicate handlers on reload)
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=log_level,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+    else:
+        root_logger.setLevel(log_level)
+
     logger.info(f"✅ Configuration loaded successfully: {config_loader.config_path}")
     logger.info(f"📊 Configured {len(app_config.upstream_services)} upstream services")
     logger.info(f"🔑 Configured {len(app_config.client_authentication.allowed_keys)} client keys")
-    
+
     MODEL_TO_SERVICE_MAPPING, ALIAS_MAPPING = config_loader.get_model_to_service_mapping()
     DEFAULT_SERVICE = config_loader.get_default_service()
     ALLOWED_CLIENT_KEYS = config_loader.get_allowed_client_keys()
     GLOBAL_TRIGGER_SIGNAL = generate_random_trigger_signal()
-    
+
     logger.info(f"🎯 Configured {len(MODEL_TO_SERVICE_MAPPING)} model mappings")
     if ALIAS_MAPPING:
         logger.info(f"🔄 Configured {len(ALIAS_MAPPING)} model aliases: {list(ALIAS_MAPPING.keys())}")
     logger.info(f"🔄 Default service: {DEFAULT_SERVICE['name']}")
-    
+
+
+try:
+    load_runtime_config()
 except Exception as e:
     logger.error(f"❌ Configuration loading failed: {type(e).__name__}")
     logger.error(f"❌ Error details: {str(e)}")
@@ -863,6 +886,15 @@ def find_upstream(model_name: str) -> tuple[Dict[str, Any], str]:
 
 app = FastAPI()
 http_client = httpx.AsyncClient()
+
+# Add CORS middleware for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # Vite dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.middleware("http")
 async def debug_middleware(request: Request, call_next):
@@ -1569,6 +1601,88 @@ async def list_models(_api_key: str = Depends(verify_api_key)):
     }
 
 
+# Admin API endpoints
+@app.post("/api/admin/login", response_model=LoginResponse)
+async def admin_login(login_data: LoginRequest, admin_config = Depends(get_admin_credentials)):
+    """Admin login endpoint"""
+    if login_data.username != admin_config.username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+    
+    if not verify_password(login_data.password, admin_config.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+    
+    access_token = create_access_token(admin_config.username, admin_config.jwt_secret)
+    return LoginResponse(access_token=access_token)
+
+
+@app.get("/api/admin/config")
+async def get_config(_username: str = Depends(verify_admin_token)):
+    """Get current configuration"""
+    try:
+        with open(config_loader.config_path, 'r', encoding='utf-8') as f:
+            config_content = yaml.safe_load(f)
+        
+        # Remove sensitive information from response
+        if 'admin_authentication' in config_content:
+            config_content['admin_authentication'] = {
+                'username': config_content['admin_authentication'].get('username', ''),
+                'password': '********',
+                'jwt_secret': '********'
+            }
+        
+        return {"success": True, "config": config_content}
+    except Exception as e:
+        logger.error(f"Failed to read config: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read configuration: {str(e)}")
+
+
+@app.put("/api/admin/config")
+async def update_config(config_data: dict, _username: str = Depends(verify_admin_token)):
+    """Update configuration"""
+    try:
+        # Read current config to preserve admin_authentication
+        current_config = None
+        try:
+            with open(config_loader.config_path, 'r', encoding='utf-8') as f:
+                current_config = yaml.safe_load(f)
+        except Exception:
+            pass
+        
+        # If admin_authentication exists in current config and not provided in update, preserve it
+        if current_config and 'admin_authentication' in current_config:
+            if 'admin_authentication' not in config_data or config_data['admin_authentication'].get('password') == '********':
+                config_data['admin_authentication'] = current_config['admin_authentication']
+        
+        # Validate the configuration using Pydantic
+        from config_loader import AppConfig
+        validated_config = AppConfig(**config_data)
+        
+        # Write the validated configuration back to file
+        with open(config_loader.config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        
+        # Reload runtime configuration so changes take effect immediately
+        load_runtime_config(reload=True)
+        logger.info(f"Configuration updated and reloaded successfully by admin: {_username}")
+        return {
+            "success": True,
+            "message": "Configuration updated successfully and applied immediately."
+        }
+    
+    except ValueError as e:
+        logger.error(f"Configuration validation failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Configuration validation failed: {str(e)}")
+    except Exception as e:
+        logger.error(f"Failed to update config: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
+
+
 def validate_message_structure(messages: List[Dict[str, Any]]) -> bool:
     """Validate if message structure meets requirements"""
     try:
@@ -1636,6 +1750,15 @@ def safe_process_tool_choice(tool_choice) -> str:
     except Exception as e:
         logger.error(f"❌ Error processing tool_choice: {e}")
         return ""
+
+# Mount static files for admin interface (if exists)
+try:
+    if os.path.exists("frontend/dist"):
+        app.mount("/admin", StaticFiles(directory="frontend/dist", html=True), name="admin")
+        logger.info("📁 Admin interface mounted at /admin")
+except Exception as e:
+    logger.warning(f"⚠️  Failed to mount admin interface: {e}")
+
 
 if __name__ == "__main__":
     import uvicorn

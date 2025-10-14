@@ -62,6 +62,33 @@ class ClientAuthConfig(BaseModel):
         return v
 
 
+class AdminAuthConfig(BaseModel):
+    """Admin authentication configuration"""
+    username: str = Field(description="Admin username")
+    password: str = Field(description="Admin password (bcrypt hashed)")
+    jwt_secret: str = Field(description="JWT secret key for token signing")
+    
+    @field_validator('username')
+    def validate_username(cls, v):
+        if not v or v.strip() == "":
+            raise ValueError('username cannot be empty')
+        return v.strip()
+    
+    @field_validator('password')
+    def validate_password(cls, v):
+        if not v or v.strip() == "":
+            raise ValueError('password cannot be empty')
+        return v
+    
+    @field_validator('jwt_secret')
+    def validate_jwt_secret(cls, v):
+        if not v or v.strip() == "":
+            raise ValueError('jwt_secret cannot be empty')
+        if len(v) < 32:
+            raise ValueError('jwt_secret must be at least 32 characters long')
+        return v
+
+
 class FeaturesConfig(BaseModel):
     """Feature configuration"""
     enable_function_calling: bool = Field(default=True, description="Enable function calling")
@@ -91,6 +118,7 @@ class AppConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     upstream_services: List[UpstreamService] = Field(description="List of upstream services")
     client_authentication: ClientAuthConfig = Field(description="Client authentication configuration")
+    admin_authentication: Optional[AdminAuthConfig] = Field(default=None, description="Admin authentication configuration")
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     
     @field_validator('upstream_services')
@@ -184,6 +212,16 @@ class ConfigLoader:
         if self._config is None:
             self.load_config()
         return self._config
+
+    def reload_config(self) -> AppConfig:
+        """Force reload configuration from disk"""
+        self._config = None
+        return self.load_config()
+
+    def reload_config(self) -> AppConfig:
+        """Force reload configuration from disk"""
+        self._config = None
+        return self.load_config()
     
     def get_model_to_service_mapping(self) -> tuple[Dict[str, Dict[str, Any]], Dict[str, List[str]]]:
         """Get model to service mapping and model aliases"""

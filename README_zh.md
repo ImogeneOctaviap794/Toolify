@@ -16,6 +16,7 @@ Toolify 是一个中间件代理，旨在为那些本身不支持函数调用功
 - **多服务路由**：根据请求的模型名称，将请求路由到不同的上游服务。
 - **客户端认证**：通过可配置的客户端 API 密钥保护中间件安全。
 - **增强的上下文感知**：在返回工具执行结果时，同时向 LLM 提供先前调用的工具详情（名称和参数），提升模型的上下文理解能力。
+- **Web 管理界面**：提供现代化的 Web 界面，可视化管理所有配置选项，无需手动编辑 YAML 文件。
 
 ## 工作原理
 
@@ -130,6 +131,69 @@ client = OpenAI(
 ```
 
 Toolify 负责处理标准 OpenAI 工具格式与不支持的 LLM 所需的基于提示词的方法之间的转换。
+
+## Web 管理界面
+
+Toolify 提供了一个现代化的 Web 管理界面，让您可以通过浏览器轻松管理所有配置。
+
+### 初始化管理员账号
+
+首次使用管理界面前，需要初始化管理员账号：
+
+```bash
+python init_admin.py
+```
+
+按照提示输入用户名和密码，脚本会自动生成哈希密码和 JWT 密钥，并更新 `config.yaml` 文件。
+
+或者，您也可以手动在 `config.yaml` 中添加以下配置：
+
+```yaml
+admin_authentication:
+  username: "admin"
+  password: "$2b$12$..."  # 使用 bcrypt 哈希的密码
+  jwt_secret: "your-secure-random-jwt-secret-min-32-chars"
+```
+
+### 访问管理界面
+
+1. 启动 Toolify 服务
+2. 在浏览器中访问 `http://localhost:8000/admin`
+3. 使用管理员账号登录
+
+### 功能特性
+
+- 📊 **服务器配置**：管理监听地址、端口和超时设置
+- 🔄 **上游服务管理**：添加、编辑、删除上游 LLM 服务配置
+- 🔑 **客户端认证**：管理客户端 API 密钥
+- ⚙️ **功能配置**：切换各项功能开关和行为参数
+- 💾 **实时保存**：配置修改后实时保存到 `config.yaml`
+- 🔐 **安全认证**：基于 JWT 的安全登录机制
+
+### 前端开发
+
+如果您需要修改管理界面的前端代码：
+
+```bash
+# 安装依赖
+cd frontend
+npm install
+
+# 开发模式（支持热重载）
+npm run dev
+
+# 构建生产版本
+npm run build
+
+# 或使用构建脚本
+cd ..
+./build_frontend.sh
+```
+
+前端技术栈：
+- React 19 + TypeScript
+- Vite 构建工具
+- Tailwind CSS + shadcn/ui 组件库
 
 ## 许可证
 

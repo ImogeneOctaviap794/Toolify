@@ -41,6 +41,13 @@ client_authentication:
     - "sk-my-secret-key-1"
     - "sk-my-secret-key-2"
 
+# Admin authentication configuration (for web UI)
+# Use init_admin.py script to generate hashed password and JWT secret
+admin_authentication:
+  username: "admin"
+  password: "$2b$12$example_hashed_password_here"  # Use init_admin.py to generate
+  jwt_secret: "your-secure-random-jwt-secret-min-32-chars"  # Use init_admin.py to generate
+
 # Feature configuration
 features:
   enable_function_calling: true  # Enable function calling feature

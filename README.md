@@ -16,6 +16,7 @@ Toolify is a middleware proxy designed to inject OpenAI-compatible function call
 - **Multi-Service Routing**: Routes requests to different upstream services based on the requested model name.
 - **Client Authentication**: Secures the middleware with configurable client API keys.
 - **Enhanced Context Awareness**: Provides LLMs with the details (name and parameters) of previous tool calls alongside the execution results, improving contextual understanding.
+- **Web Admin Interface**: Modern web-based UI for managing all configuration options visually, no need to manually edit YAML files.
 
 ## How It Works
 
@@ -130,6 +131,69 @@ client = OpenAI(
 ```
 
 Toolify handles the translation between the standard OpenAI tool format and the prompt-based method required by unsupported LLMs.
+
+## Web Admin Interface
+
+Toolify provides a modern web-based admin interface for easy configuration management through your browser.
+
+### Initialize Admin Account
+
+Before using the admin interface, initialize an admin account:
+
+```bash
+python init_admin.py
+```
+
+Follow the prompts to enter a username and password. The script will automatically generate a hashed password and JWT secret, then update your `config.yaml` file.
+
+Alternatively, you can manually add the following configuration to `config.yaml`:
+
+```yaml
+admin_authentication:
+  username: "admin"
+  password: "$2b$12$..."  # bcrypt hashed password
+  jwt_secret: "your-secure-random-jwt-secret-min-32-chars"
+```
+
+### Access Admin Interface
+
+1. Start the Toolify service
+2. Open `http://localhost:8000/admin` in your browser
+3. Login with your admin credentials
+
+### Features
+
+- 📊 **Server Configuration**: Manage host, port, and timeout settings
+- 🔄 **Upstream Services**: Add, edit, and remove upstream LLM service configurations
+- 🔑 **Client Authentication**: Manage client API keys
+- ⚙️ **Feature Configuration**: Toggle feature flags and behavior parameters
+- 💾 **Real-time Saving**: Changes are saved directly to `config.yaml`
+- 🔐 **Secure Authentication**: JWT-based secure login system
+
+### Frontend Development
+
+If you need to modify the admin interface frontend:
+
+```bash
+# Install dependencies
+cd frontend
+npm install
+
+# Development mode (with hot reload)
+npm run dev
+
+# Build for production
+npm run build
+
+# Or use the build script
+cd ..
+./build_frontend.sh
+```
+
+Frontend Tech Stack:
+- React 19 + TypeScript
+- Vite build tool
+- Tailwind CSS + shadcn/ui component library
 
 ## License
 
