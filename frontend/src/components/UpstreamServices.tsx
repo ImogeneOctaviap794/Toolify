@@ -92,6 +92,11 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                       未配置密钥
                     </span>
                   )}
+                  {service.models.length === 0 && (
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-300">
+                      未配置模型
+                    </span>
+                  )}
                 </CardTitle>
                 <CardDescription>{service.description || '上游服务配置'}</CardDescription>
               </div>
@@ -227,7 +232,7 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                 <li><strong>同模型多渠道</strong>：可以为同一个模型配置多个服务（如 gpt-4 配置多个 OpenAI 代理）</li>
                 <li><strong>流式请求</strong>：始终使用最高优先级渠道（因为流式响应无法中途切换）</li>
                 <li><strong>客户端错误</strong>：400/401/403 等客户端错误不会触发故障转移</li>
-                <li><strong>占位符配置</strong>：可以保存空 API Key 的服务配置，系统会自动跳过，不影响正常使用</li>
+                <li><strong>占位符配置</strong>：可以保存空 API Key 或空模型列表的服务，系统会自动跳过，方便提前规划配置</li>
               </ul>
             </div>
 

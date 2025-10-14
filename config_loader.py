@@ -29,7 +29,7 @@ class UpstreamService(BaseModel):
     @field_validator('base_url')
     def validate_base_url(cls, v):
         if not v.startswith(('http://', 'https://')):
-            raise ValueError('base_url must start with http:// or https://')
+            raise ValueError('Base URL 必须以 http:// 或 https:// 开头')
         return v.rstrip('/')
     
     @field_validator('api_key')
@@ -56,10 +56,10 @@ class ClientAuthConfig(BaseModel):
     @field_validator('allowed_keys')
     def validate_allowed_keys(cls, v):
         if not v or len(v) == 0:
-            raise ValueError('allowed_keys cannot be empty')
+            raise ValueError('客户端认证密钥列表不能为空，至少需要一个 API Key')
         for key in v:
             if not key or key.strip() == "":
-                raise ValueError('API key cannot be empty')
+                raise ValueError('客户端 API Key 不能为空')
         return v
 
 
@@ -72,21 +72,21 @@ class AdminAuthConfig(BaseModel):
     @field_validator('username')
     def validate_username(cls, v):
         if not v or v.strip() == "":
-            raise ValueError('username cannot be empty')
+            raise ValueError('管理员用户名不能为空')
         return v.strip()
     
     @field_validator('password')
     def validate_password(cls, v):
         if not v or v.strip() == "":
-            raise ValueError('password cannot be empty')
+            raise ValueError('管理员密码不能为空')
         return v
     
     @field_validator('jwt_secret')
     def validate_jwt_secret(cls, v):
         if not v or v.strip() == "":
-            raise ValueError('jwt_secret cannot be empty')
+            raise ValueError('JWT 密钥不能为空')
         if len(v) < 32:
-            raise ValueError('jwt_secret must be at least 32 characters long')
+            raise ValueError('JWT 密钥长度至少需要 32 个字符')
         return v
 
 
@@ -103,14 +103,14 @@ class FeaturesConfig(BaseModel):
     def validate_log_level(cls, v):
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "DISABLED"]
         if v.upper() not in valid_levels:
-            raise ValueError(f"log_level must be one of {valid_levels}")
+            raise ValueError(f"日志级别必须是以下之一: {', '.join(valid_levels)}")
         return v.upper()
 
     @field_validator('prompt_template')
     def validate_prompt_template(cls, v):
         if v:
             if "{tools_list}" not in v or "{trigger_signal}" not in v:
-                raise ValueError("prompt_template must contain {tools_list} and {trigger_signal} placeholders")
+                raise ValueError("自定义提示词模板必须包含 {tools_list} 和 {trigger_signal} 占位符")
         return v
 
 
@@ -125,7 +125,7 @@ class AppConfig(BaseModel):
     @field_validator('upstream_services')
     def validate_upstream_services(cls, v, info):
         if not v or len(v) == 0:
-            raise ValueError('upstream_services cannot be empty')
+            raise ValueError('上游服务列表不能为空，至少需要配置一个上游服务')
         
         # Get features config to check model_passthrough mode
         features = info.data.get('features', FeaturesConfig())
@@ -135,42 +135,41 @@ class AppConfig(BaseModel):
         if model_passthrough:
             openai_service = next((s for s in v if s.name == 'openai'), None)
             if not openai_service:
-                raise ValueError("When model_passthrough is enabled, an upstream service named 'openai' must be configured")
+                raise ValueError("启用 model_passthrough 时必须配置名为 'openai' 的上游服务")
         else:
-            # In normal mode, validate that services have models
-            for service in v:
-                if not service.models or len(service.models) == 0:
-                    raise ValueError(f"Service '{service.name}' must have at least one model when model_passthrough is disabled")
+            # In normal mode, allow empty models list (will be skipped at runtime)
+            # Just log a warning for services without models
+            pass
         
         default_services = [service for service in v if service.is_default]
         if len(default_services) == 0:
-            raise ValueError('Must have at least one default upstream service (is_default: true)')
+            raise ValueError('至少需要一个默认上游服务（is_default: true）')
         if len(default_services) > 1:
-            raise ValueError('Only one upstream service can be marked as default')
+            raise ValueError('只能有一个上游服务标记为默认服务')
         
-        all_models = set()
+        # Validate model format and collect aliases
+        # Note: Now we allow same model in multiple services (for multi-channel support)
         all_aliases = set()
+        regular_models = set()
         
         for service in v:
             for model in service.models:
-                if model in all_models:
-                    raise ValueError(f'Duplicate model entry found: {model}')
-                all_models.add(model)
-                
                 if ':' in model:
                     parts = model.split(':', 1)
                     if len(parts) == 2:
                         alias, real_model = parts
                         if not alias.strip() or not real_model.strip():
-                            raise ValueError(f"Invalid alias format in '{model}'. Both parts must not be empty.")
+                            raise ValueError(f"模型别名格式错误: '{model}'，别名和模型名都不能为空")
                         all_aliases.add(alias)
                     else:
-                        raise ValueError(f"Invalid model format with colon: {model}")
+                        raise ValueError(f"模型格式错误: {model}")
+                else:
+                    regular_models.add(model)
 
-        regular_models = {m for m in all_models if ':' not in m}
+        # Check for conflicts between aliases and regular model names
         conflicts = all_aliases.intersection(regular_models)
         if conflicts:
-            raise ValueError(f"Alias names {conflicts} conflict with model names.")
+            raise ValueError(f"别名 {conflicts} 与模型名冲突，请使用不同的名称")
                 
         return v
 
@@ -231,6 +230,10 @@ class ConfigLoader:
         alias_mapping = {}
         
         for service in config.upstream_services:
+            # Skip services without models
+            if not service.models or len(service.models) == 0:
+                continue
+                
             service_info = {
                 "name": service.name,
                 "base_url": service.base_url,
