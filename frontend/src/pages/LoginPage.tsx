@@ -40,9 +40,9 @@ export default function LoginPage() {
               <LogIn className="w-6 h-6 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Toolify 配置管理</CardTitle>
+          <CardTitle className="text-2xl text-center">Toolify Admin</CardTitle>
           <CardDescription className="text-center">
-            请使用管理员账号登录
+            请使用管理员账号登录配置管理系统
           </CardDescription>
         </CardHeader>
         <CardContent>

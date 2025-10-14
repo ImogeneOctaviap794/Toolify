@@ -24,7 +24,7 @@ export default function ServerConfig({ config, setConfig }: ServerConfigProps) {
       <CardHeader>
         <CardTitle>服务器配置</CardTitle>
         <CardDescription>
-          配置 Toolify 服务器的基本运行参数
+          配置 Toolify Admin 服务器的基本运行参数
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

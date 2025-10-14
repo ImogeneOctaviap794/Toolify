@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Build frontend script for Toolify
-echo "🔨 Building Toolify Admin Frontend..."
+# Build frontend script for Toolify Admin
+echo "🔨 构建 Toolify Admin 前端管理界面..."
 
 cd frontend || exit 1
 
@@ -16,14 +16,14 @@ echo "🏗️  Building production bundle..."
 npm run build
 
 if [ $? -eq 0 ]; then
-    echo "✅ Frontend built successfully!"
-    echo "📁 Build output: frontend/dist/"
+    echo "✅ 前端构建成功！"
+    echo "📁 构建输出: frontend/dist/"
     echo ""
-    echo "Next steps:"
-    echo "1. Restart the Toolify service"
-    echo "2. Access admin interface at http://localhost:8000/admin"
+    echo "后续步骤:"
+    echo "1. 重启 Toolify Admin 服务"
+    echo "2. 访问管理界面: http://localhost:8000/admin"
 else
-    echo "❌ Build failed!"
+    echo "❌ 构建失败！"
     exit 1
 fi
 

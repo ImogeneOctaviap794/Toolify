@@ -87,9 +87,9 @@ export default function ConfigPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Toolify 配置管理</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Toolify Admin 配置管理</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                管理 Toolify 服务的所有配置选项
+                可视化管理 Toolify 服务的所有配置选项
               </p>
             </div>
             <div className="flex items-center gap-3">

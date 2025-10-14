@@ -1,10 +1,16 @@
-# Toolify
+# Toolify Admin
 
 [English](README.md) | [简体中文](README_zh.md)
 
-**为任何大型语言模型赋予函数调用能力。**
+> **项目来源**: 本项目基于 [funnycups/toolify](https://github.com/funnycups/toolify) 开发  
+> **主要改进**: 新增 Web 管理界面，支持可视化配置管理和实时配置重载  
+> **致谢**: 感谢原作者 FunnyCups 开发的优秀 Toolify 中间件项目
 
-Toolify 是一个中间件代理，旨在为那些本身不支持函数调用功能的大型语言模型，或未提供函数调用功能的 OpenAI 接口注入兼容 OpenAI 格式的函数调用能力。它作为您的应用程序和上游 LLM API 之间的中介，负责注入必要的提示词并从模型的响应中解析工具调用。
+---
+
+**为任何大型语言模型赋予函数调用能力，并提供可视化配置管理界面。**
+
+Toolify Admin 是一个 LLM 函数调用中间件代理，在原 Toolify 项目基础上增强了管理功能。它为不支持函数调用的大型语言模型注入 OpenAI 兼容的函数调用能力，同时提供现代化的 Web 管理界面，让您无需手动编辑 YAML 文件即可轻松管理所有配置。
 
 ## 核心特性
 

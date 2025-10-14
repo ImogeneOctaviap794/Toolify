@@ -1,10 +1,16 @@
-# Toolify
+# Toolify Admin
 
 [English](README.md) | [简体中文](README_zh.md)
 
-**Empower any LLM with function calling capabilities.**
+> **Project Origin**: This project is based on [funnycups/toolify](https://github.com/funnycups/toolify)  
+> **Key Enhancements**: Added web admin interface with visual configuration management and real-time config reload  
+> **Acknowledgments**: Special thanks to FunnyCups for creating the excellent Toolify middleware project
 
-Toolify is a middleware proxy designed to inject OpenAI-compatible function calling capabilities into Large Language Models that do not natively support it, or into OpenAI API interfaces that do not provide this functionality. It acts as an intermediary between your application and the upstream LLM API, injecting necessary prompts and parsing tool calls from the model's response.
+---
+
+**Empower any LLM with function calling capabilities, plus a visual admin interface.**
+
+Toolify Admin is an enhanced version of the Toolify middleware proxy with added management features. It injects OpenAI-compatible function calling capabilities into Large Language Models that lack native support, while providing a modern web-based admin interface for easy configuration management without manually editing YAML files.
 
 ## Key Features
 

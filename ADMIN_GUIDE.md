@@ -1,8 +1,8 @@
-# Toolify Web 管理界面快速指南
+# Toolify Admin Web 管理界面快速指南
 
 ## 概述
 
-Toolify 现在提供了一个现代化的 Web 管理界面，让您可以通过浏览器轻松管理所有配置，无需手动编辑 YAML 文件。
+Toolify Admin 提供了一个现代化的 Web 管理界面，让您可以通过浏览器轻松管理所有配置，无需手动编辑 YAML 文件。
 
 ## 初始设置
 

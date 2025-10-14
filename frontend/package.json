@@ -1,8 +1,9 @@
 {
-  "name": "toolify-admin",
+  "name": "toolify-admin-ui",
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "description": "Web admin interface for Toolify Admin",
   "scripts": {
     "dev": "vite --port 3000",
     "build": "tsc && vite build",

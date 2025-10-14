@@ -50,7 +50,7 @@ export default function ClientAuth({ config, setConfig }: ClientAuthProps) {
       <CardHeader>
         <CardTitle>客户端认证配置</CardTitle>
         <CardDescription>
-          管理允许访问 Toolify 服务的客户端 API 密钥
+          管理允许访问 Toolify Admin 服务的客户端 API 密钥
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

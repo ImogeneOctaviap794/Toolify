@@ -18,7 +18,7 @@ from admin_auth import hash_password, generate_jwt_secret
 def init_admin():
     """Initialize admin credentials"""
     print("=" * 60)
-    print("Toolify Admin Initialization")
+    print("Toolify Admin 管理员初始化")
     print("=" * 60)
     print()
     
@@ -100,10 +100,10 @@ admin_authentication:
         print("\n📋 Please manually add the admin_authentication section to your config.yaml")
     
     print("\n" + "=" * 60)
-    print("Next steps:")
-    print("1. Ensure admin_authentication is in config.yaml")
-    print("2. Restart the Toolify service")
-    print("3. Access admin interface at http://localhost:8000/admin")
+    print("后续步骤:")
+    print("1. 确保 config.yaml 中包含 admin_authentication 配置")
+    print("2. 重启 Toolify Admin 服务")
+    print("3. 访问管理界面: http://localhost:8000/admin")
     print("=" * 60)
 
 
