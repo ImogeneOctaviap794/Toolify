@@ -49,8 +49,8 @@ Toolify Admin 是一个 LLM 函数调用中间件代理，在原 Toolify 项目�
 1. **克隆仓库：**
 
    ```bash
-   git clone https://github.com/funnycups/toolify.git
-   cd toolify
+   git clone https://github.com/ImogeneOctaviap794/Toolify.git
+   cd Toolify
    ```
 
 2. **配置应用程序：**

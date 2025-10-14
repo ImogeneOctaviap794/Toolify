@@ -49,8 +49,8 @@ This is the recommended way for easy deployment.
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/funnycups/toolify.git
-   cd toolify
+   git clone https://github.com/ImogeneOctaviap794/Toolify.git
+   cd Toolify
    ```
 
 2. **Configure the application:**
