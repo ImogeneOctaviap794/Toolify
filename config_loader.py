@@ -34,8 +34,8 @@ class UpstreamService(BaseModel):
     
     @field_validator('api_key')
     def validate_api_key(cls, v):
-        if not v or v.strip() == "":
-            raise ValueError('api_key cannot be empty')
+        # Allow empty api_key for placeholder configurations
+        # Actual validation happens when service is used
         return v
     
     @field_validator('models')

@@ -849,8 +849,10 @@ def find_upstream(model_name: str) -> tuple[List[Dict[str, Any]], str]:
         for service in app_config.upstream_services:
             if service.name == "openai":
                 service_dict = service.model_dump()
-                if not service_dict.get("api_key"):
-                    raise HTTPException(status_code=500, detail="Configuration error: API key not found for the 'openai' service in model passthrough mode.")
+                # Skip services with empty API keys
+                if not service_dict.get("api_key") or service_dict.get("api_key").strip() == "":
+                    logger.warning(f"⚠️  Skipping 'openai' service with empty API key")
+                    continue
                 openai_services.append(service_dict)
         
         if openai_services:
@@ -858,7 +860,7 @@ def find_upstream(model_name: str) -> tuple[List[Dict[str, Any]], str]:
             openai_services = sorted(openai_services, key=lambda x: x.get('priority', 0))
             return openai_services, model_name
         else:
-            raise HTTPException(status_code=500, detail="Configuration error: 'model_passthrough' is enabled, but no upstream service named 'openai' was found.")
+            raise HTTPException(status_code=500, detail="Configuration error: 'model_passthrough' is enabled, but no valid 'openai' service with API key was found.")
 
     # Default routing logic
     chosen_model_entry = model_name
@@ -870,9 +872,18 @@ def find_upstream(model_name: str) -> tuple[List[Dict[str, Any]], str]:
     services = MODEL_TO_SERVICE_MAPPING.get(chosen_model_entry)
     
     if services:
+        # Filter out services with empty API keys and log warning
+        valid_services = []
         for service in services:
-            if not service.get("api_key"):
-                raise HTTPException(status_code=500, detail=f"Model configuration error: API key not found for service '{service.get('name')}'.")
+            if not service.get("api_key") or service.get("api_key").strip() == "":
+                logger.warning(f"⚠️  Skipping service '{service.get('name')}' - API key is empty")
+            else:
+                valid_services.append(service)
+        
+        if not valid_services:
+            raise HTTPException(status_code=500, detail=f"Model configuration error: No valid API keys found for model '{chosen_model_entry}'")
+        
+        services = valid_services
     else:
         logger.warning(f"⚠️  Model '{model_name}' not found in configuration, using default service")
         services = [DEFAULT_SERVICE]
