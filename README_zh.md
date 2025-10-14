@@ -20,9 +20,10 @@ Toolify Admin 是一个 LLM 函数调用中间件代理，在原 Toolify 项目�
 - **兼容 `<think>` 标签**：无缝处理 `<think>` 标签，确保它们不会干扰工具解析。
 - **流式响应支持**：全面支持流式响应，实时检测和解析函数调用。
 - **多服务路由**：根据请求的模型名称，将请求路由到不同的上游服务。
+- **多渠道优先级与故障转移**：支持为同一模型配置多个渠道，按优先级自动故障转移，提升服务可用性。
 - **客户端认证**：通过可配置的客户端 API 密钥保护中间件安全。
 - **增强的上下文感知**：在返回工具执行结果时，同时向 LLM 提供先前调用的工具详情（名称和参数），提升模型的上下文理解能力。
-- **Web 管理界面**：提供现代化的 Web 界面，可视化管理所有配置选项，无需手动编辑 YAML 文件。
+- **Web 管理界面**：提供现代化的 Web 界面，可视化管理所有配置选项，实时生效无需重启。
 
 ## 工作原理
 
@@ -155,6 +156,69 @@ client = OpenAI(
 ```
 
 Toolify 负责处理标准 OpenAI 工具格式与不支持的 LLM 所需的基于提示词的方法之间的转换。
+
+## 多渠道优先级与故障转移
+
+Toolify Admin 支持为同一个模型配置多个上游渠道，并根据优先级进行自动故障转移，显著提升服务的可用性和稳定性。
+
+### 功能特点
+
+- **优先级机制**：为每个服务配置 `priority` 值（数字越小优先级越高，0 为最高）
+- **自动故障转移**：当高优先级渠道失败时，自动尝试下一优先级的渠道
+- **智能重试策略**：
+  - 对于 429（限流）和 5xx（服务器错误）：自动切换到备用渠道
+  - 对于 400/401/403（客户端错误）：不进行重试（因为换渠道也会失败）
+- **同模型多渠道**：可以为同一个模型配置多个 OpenAI 代理或镜像站
+- **透明切换**：对客户端完全透明，自动处理所有故障转移逻辑
+
+### 配置示例
+
+```yaml
+upstream_services:
+  # 主渠道 - 最高优先级
+  - name: "openai-primary"
+    base_url: "https://api.openai.com/v1"
+    api_key: "your-primary-key"
+    priority: 0  # 最高优先级
+    is_default: true
+    models:
+      - "gpt-4"
+      - "gpt-4o"
+      - "gpt-3.5-turbo"
+  
+  # 备用渠道 - 第二优先级
+  - name: "openai-backup"
+    base_url: "https://api.openai-proxy.com/v1"
+    api_key: "your-backup-key"
+    priority: 1  # 第二优先级
+    is_default: false
+    models:
+      - "gpt-4"
+      - "gpt-4o"
+  
+  # 第三优先级渠道
+  - name: "openai-fallback"
+    base_url: "https://another-proxy.com/v1"
+    api_key: "your-fallback-key"
+    priority: 2
+    is_default: false
+    models:
+      - "gpt-4"
+```
+
+### 工作流程
+
+1. 请求 `gpt-4` 模型
+2. 系统首先尝试 `priority: 0` 的渠道（openai-primary）
+3. 如果返回 429 或 500+ 错误，自动切换到 `priority: 1` 的渠道（openai-backup）
+4. 如果仍然失败，继续尝试 `priority: 2` 的渠道（openai-fallback）
+5. 只有所有渠道都失败时才返回错误给客户端
+
+### 注意事项
+
+- **流式请求**：由于流式响应的特性，始终使用最高优先级的渠道（无法中途切换）
+- **相同优先级**：多个服务可以有相同的优先级，此时按配置文件中的顺序尝试
+- **模型匹配**：只有配置了相同模型的服务才会参与故障转移
 
 ## Web 管理界面
 

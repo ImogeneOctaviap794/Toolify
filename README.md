@@ -20,9 +20,10 @@ Toolify Admin is an enhanced version of the Toolify middleware proxy with added 
 - **Think Tag Compatibility**: Seamlessly handles `<think>` tags, ensuring they don't interfere with tool parsing.
 - **Streaming Support**: Fully supports streaming responses, detecting and parsing function calls on the fly.
 - **Multi-Service Routing**: Routes requests to different upstream services based on the requested model name.
+- **Multi-Channel Priority & Failover**: Configure multiple channels for the same model with priority-based automatic failover to improve service availability.
 - **Client Authentication**: Secures the middleware with configurable client API keys.
 - **Enhanced Context Awareness**: Provides LLMs with the details (name and parameters) of previous tool calls alongside the execution results, improving contextual understanding.
-- **Web Admin Interface**: Modern web-based UI for managing all configuration options visually, no need to manually edit YAML files.
+- **Web Admin Interface**: Modern web-based UI for managing all configuration options visually with real-time config reload.
 
 ## How It Works
 
@@ -155,6 +156,69 @@ client = OpenAI(
 ```
 
 Toolify handles the translation between the standard OpenAI tool format and the prompt-based method required by unsupported LLMs.
+
+## Multi-Channel Priority & Failover
+
+Toolify Admin supports configuring multiple upstream channels for the same model with priority-based automatic failover, significantly improving service availability and stability.
+
+### Features
+
+- **Priority Mechanism**: Configure `priority` value for each service (lower number = higher priority, 0 is highest)
+- **Automatic Failover**: Automatically try next priority channel when high-priority channel fails
+- **Smart Retry Strategy**:
+  - For 429 (rate limit) and 5xx (server errors): Automatically switch to backup channel
+  - For 400/401/403 (client errors): No retry (would fail on other channels too)
+- **Same Model Multi-Channel**: Configure multiple OpenAI proxies or mirrors for the same model
+- **Transparent Switching**: Completely transparent to clients, handles all failover logic automatically
+
+### Configuration Example
+
+```yaml
+upstream_services:
+  # Primary channel - highest priority
+  - name: "openai-primary"
+    base_url: "https://api.openai.com/v1"
+    api_key: "your-primary-key"
+    priority: 0  # Highest priority
+    is_default: true
+    models:
+      - "gpt-4"
+      - "gpt-4o"
+      - "gpt-3.5-turbo"
+  
+  # Backup channel - second priority
+  - name: "openai-backup"
+    base_url: "https://api.openai-proxy.com/v1"
+    api_key: "your-backup-key"
+    priority: 1  # Second priority
+    is_default: false
+    models:
+      - "gpt-4"
+      - "gpt-4o"
+  
+  # Third priority channel
+  - name: "openai-fallback"
+    base_url: "https://another-proxy.com/v1"
+    api_key: "your-fallback-key"
+    priority: 2
+    is_default: false
+    models:
+      - "gpt-4"
+```
+
+### Workflow
+
+1. Request `gpt-4` model
+2. System first tries `priority: 0` channel (openai-primary)
+3. If returns 429 or 500+ error, automatically switches to `priority: 1` channel (openai-backup)
+4. If still fails, continues to try `priority: 2` channel (openai-fallback)
+5. Only returns error to client when all channels have failed
+
+### Notes
+
+- **Streaming Requests**: Due to the nature of streaming responses, always uses highest priority channel (cannot switch mid-stream)
+- **Same Priority**: Multiple services can have same priority, in which case they're tried in config file order
+- **Model Matching**: Only services configured with the same model participate in failover
 
 ## Web Admin Interface
 

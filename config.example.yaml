@@ -14,6 +14,7 @@ upstream_services:
     api_key: "your-openai-api-key-here"
     description: "OpenAI Official Service"
     is_default: true
+    priority: 0  # Priority level (lower number = higher priority, 0 is highest)
     models:
       - "gpt-3.5-turbo"
       - "gpt-3.5-turbo-16k"
@@ -22,11 +23,22 @@ upstream_services:
       - "gpt-4o"
       - "gpt-4o-mini"
 
+  - name: "openai-backup"
+    base_url: "https://api.openai-proxy.com/v1"
+    api_key: "your-backup-api-key-here"
+    description: "OpenAI Backup Service (fallback)"
+    is_default: false
+    priority: 1  # Backup channel with lower priority
+    models:
+      - "gpt-4"
+      - "gpt-4o"
+
   - name: "google"
     base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
     api_key: "your-google-api-key-here"
     description: "Google Gemini Service"
     is_default: false
+    priority: 0
     models:
       # Use alias "gemini-2.5" to randomly select one of the following models
       - "gemini-2.5:gemini-2.5-pro"

@@ -22,6 +22,7 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
       api_key: '',
       description: '',
       is_default: false,
+      priority: config.upstream_services.length,
       models: []
     }
     setConfig({
@@ -135,6 +136,21 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor={`priority-${index}`}>优先级</Label>
+                  <Input
+                    id={`priority-${index}`}
+                    type="number"
+                    value={service.priority}
+                    onChange={(e) => updateService(index, 'priority', parseInt(e.target.value) || 0)}
+                    placeholder="0"
+                    min="0"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    数字越小优先级越高，0为最高
+                  </p>
+                </div>
+
                 <div className="space-y-2 md:col-span-2">
                   <Label>Base URL</Label>
                   <Input
@@ -184,6 +200,44 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
         <Plus className="w-4 h-4 mr-2" />
         添加上游服务
       </Button>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>多渠道优先级说明</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Toolify Admin 支持为同一个模型配置多个上游渠道，并按优先级进行故障转移。
+            </p>
+            
+            <div className="bg-muted/50 border rounded-lg p-4">
+              <h4 className="font-medium mb-2">工作原理</h4>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li><strong>优先级</strong>：数字越小优先级越高（0 为最高优先级）</li>
+                <li><strong>自动故障转移</strong>：当高优先级渠道返回 429（限流）或 5xx 错误时，自动切换到下一优先级渠道</li>
+                <li><strong>同模型多渠道</strong>：可以为同一个模型配置多个服务（如 gpt-4 配置多个 OpenAI 代理）</li>
+                <li><strong>流式请求</strong>：始终使用最高优先级渠道（因为流式响应无法中途切换）</li>
+                <li><strong>客户端错误</strong>：400/401/403 等客户端错误不会触发故障转移</li>
+              </ul>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium mb-2 text-blue-900">配置示例</h4>
+              <pre className="text-xs text-blue-800 overflow-x-auto">
+{`upstream_services:
+  - name: "openai-primary"
+    priority: 0  # 主渠道
+    models: ["gpt-4", "gpt-4o"]
+  
+  - name: "openai-backup"
+    priority: 1  # 备用渠道
+    models: ["gpt-4", "gpt-4o"]`}
+              </pre>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

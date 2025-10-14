@@ -24,6 +24,7 @@ class UpstreamService(BaseModel):
     models: List[str] = Field(default_factory=list, description="List of supported models")
     description: str = Field(default="", description="Service description")
     is_default: bool = Field(default=False, description="Is default service")
+    priority: int = Field(default=0, description="Priority level (lower number = higher priority, 0 is highest)")
     
     @field_validator('base_url')
     def validate_base_url(cls, v):
@@ -223,10 +224,10 @@ class ConfigLoader:
         self._config = None
         return self.load_config()
     
-    def get_model_to_service_mapping(self) -> tuple[Dict[str, Dict[str, Any]], Dict[str, List[str]]]:
-        """Get model to service mapping and model aliases"""
+    def get_model_to_service_mapping(self) -> tuple[Dict[str, List[Dict[str, Any]]], Dict[str, List[str]]]:
+        """Get model to service mapping (now returns list of services per model, sorted by priority) and model aliases"""
         config = self.config
-        model_mapping = {}
+        model_mapping: Dict[str, List[Dict[str, Any]]] = {}
         alias_mapping = {}
         
         for service in config.upstream_services:
@@ -235,11 +236,16 @@ class ConfigLoader:
                 "base_url": service.base_url,
                 "api_key": service.api_key,
                 "description": service.description,
-                "is_default": service.is_default
+                "is_default": service.is_default,
+                "priority": service.priority
             }
             
             for model_entry in service.models:
-                model_mapping[model_entry] = service_info
+                # Support multiple services for the same model
+                if model_entry not in model_mapping:
+                    model_mapping[model_entry] = []
+                model_mapping[model_entry].append(service_info)
+                
                 if ':' in model_entry:
                     parts = model_entry.split(':', 1)
                     if len(parts) == 2:
@@ -247,6 +253,10 @@ class ConfigLoader:
                         if alias not in alias_mapping:
                             alias_mapping[alias] = []
                         alias_mapping[alias].append(model_entry)
+        
+        # Sort services by priority (lower number = higher priority)
+        for model_entry in model_mapping:
+            model_mapping[model_entry] = sorted(model_mapping[model_entry], key=lambda x: x['priority'])
         
         return model_mapping, alias_mapping
     

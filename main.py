@@ -20,7 +20,7 @@ import yaml
 from typing import List, Dict, Any, Optional, Literal, Union
 from collections import OrderedDict
 
-from fastapi import FastAPI, Request, Header, HTTPException, Depends
+from fastapi import FastAPI, Request, Header, HTTPException, Depends, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -838,23 +838,25 @@ def parse_function_calls_xml(xml_string: str, trigger_signal: str) -> Optional[L
     logger.debug(f"🔧 Final parsing result: {results}")
     return results if results else None
 
-def find_upstream(model_name: str) -> tuple[Dict[str, Any], str]:
-    """Find upstream configuration by model name, handling aliases and passthrough mode."""
+def find_upstream(model_name: str) -> tuple[List[Dict[str, Any]], str]:
+    """Find upstream configurations by model name, handling aliases and passthrough mode.
+    Returns list of services sorted by priority and the actual model name to use."""
     
     # Handle model passthrough mode
     if app_config.features.model_passthrough:
         logger.info("🔄 Model passthrough mode is active. Forwarding to 'openai' service.")
-        openai_service = None
+        openai_services = []
         for service in app_config.upstream_services:
             if service.name == "openai":
-                openai_service = service.model_dump()
-                break
+                service_dict = service.model_dump()
+                if not service_dict.get("api_key"):
+                    raise HTTPException(status_code=500, detail="Configuration error: API key not found for the 'openai' service in model passthrough mode.")
+                openai_services.append(service_dict)
         
-        if openai_service:
-            if not openai_service.get("api_key"):
-                 raise HTTPException(status_code=500, detail="Configuration error: API key not found for the 'openai' service in model passthrough mode.")
-            # In passthrough mode, the model name from the request is used directly.
-            return openai_service, model_name
+        if openai_services:
+            # Sort by priority
+            openai_services = sorted(openai_services, key=lambda x: x.get('priority', 0))
+            return openai_services, model_name
         else:
             raise HTTPException(status_code=500, detail="Configuration error: 'model_passthrough' is enabled, but no upstream service named 'openai' was found.")
 
@@ -865,15 +867,16 @@ def find_upstream(model_name: str) -> tuple[Dict[str, Any], str]:
         chosen_model_entry = random.choice(ALIAS_MAPPING[model_name])
         logger.info(f"🔄 Model alias '{model_name}' detected. Randomly selected '{chosen_model_entry}' for this request.")
 
-    service = MODEL_TO_SERVICE_MAPPING.get(chosen_model_entry)
+    services = MODEL_TO_SERVICE_MAPPING.get(chosen_model_entry)
     
-    if service:
-        if not service.get("api_key"):
-            raise HTTPException(status_code=500, detail=f"Model configuration error: API key not found for service '{service.get('name')}'.")
+    if services:
+        for service in services:
+            if not service.get("api_key"):
+                raise HTTPException(status_code=500, detail=f"Model configuration error: API key not found for service '{service.get('name')}'.")
     else:
         logger.warning(f"⚠️  Model '{model_name}' not found in configuration, using default service")
-        service = DEFAULT_SERVICE
-        if not service.get("api_key"):
+        services = [DEFAULT_SERVICE]
+        if not services[0].get("api_key"):
             raise HTTPException(status_code=500, detail="Service configuration error: Default API key not found.")
 
     actual_model_name = chosen_model_entry
@@ -882,7 +885,7 @@ def find_upstream(model_name: str) -> tuple[Dict[str, Any], str]:
          if len(parts) == 2:
              _, actual_model_name = parts
             
-    return service, actual_model_name
+    return services, actual_model_name
 
 app = FastAPI()
 http_client = httpx.AsyncClient()
@@ -1034,8 +1037,11 @@ async def chat_completions(
         logger.debug(f"🔧 Number of tools: {len(body.tools) if body.tools else 0}")
         logger.debug(f"🔧 Streaming: {body.stream}")
         
-        upstream, actual_model = find_upstream(body.model)
-        upstream_url = f"{upstream['base_url']}/chat/completions"
+        upstreams, actual_model = find_upstream(body.model)
+        
+        logger.debug(f"🔧 Found {len(upstreams)} upstream service(s) for model {body.model}")
+        for i, srv in enumerate(upstreams):
+            logger.debug(f"🔧 Service {i+1}: {srv['name']} (priority: {srv.get('priority', 0)})")
         
         logger.debug(f"🔧 Starting message preprocessing, original message count: {len(body.messages)}")
         processed_messages = preprocess_messages(body.messages)
@@ -1094,180 +1100,190 @@ async def chat_completions(
         if "tool_choice" in request_body_dict:
             del request_body_dict["tool_choice"]
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {_api_key}" if app_config.features.key_passthrough else f"Bearer {upstream['api_key']}",
-        "Accept": "application/json" if not body.stream else "text/event-stream"
-    }
-
-    logger.info(f"📝 Forwarding request to upstream: {upstream['name']}")
-    logger.info(f"📝 Model: {request_body_dict.get('model', 'unknown')}, Messages: {len(request_body_dict.get('messages', []))}")
-
+    # Try each upstream service by priority until one succeeds
+    last_error = None
+    
     if not body.stream:
-        try:
-            logger.debug(f"🔧 Sending upstream request to: {upstream_url}")
-            logger.debug(f"🔧 has_function_call: {has_function_call}")
-            logger.debug(f"🔧 Request body contains tools: {bool(body.tools)}")
+        # Non-streaming: try each upstream with failover
+        for upstream_idx, upstream in enumerate(upstreams):
+            upstream_url = f"{upstream['base_url']}/chat/completions"
             
-            upstream_response = await http_client.post(
-                upstream_url, json=request_body_dict, headers=headers, timeout=app_config.server.timeout
-            )
-            upstream_response.raise_for_status() # If status code is 4xx or 5xx, raise exception
-            
-            response_json = upstream_response.json()
-            logger.debug(f"🔧 Upstream response status code: {upstream_response.status_code}")
-            
-            # Count output tokens and handle usage
-            completion_text = ""
-            if response_json.get("choices") and len(response_json["choices"]) > 0:
-                content = response_json["choices"][0].get("message", {}).get("content")
-                if content:
-                    completion_text = content
-            
-            # Calculate our estimated tokens
-            estimated_completion_tokens = token_counter.count_text_tokens(completion_text, body.model) if completion_text else 0
-            estimated_prompt_tokens = prompt_tokens
-            estimated_total_tokens = estimated_prompt_tokens + estimated_completion_tokens
-            elapsed_time = time.time() - start_time
-            
-            # Check if upstream provided usage and respect it
-            upstream_usage = response_json.get("usage", {})
-            if upstream_usage:
-                # Preserve upstream's usage structure and only replace zero values
-                final_usage = upstream_usage.copy()
-                
-                # Replace zero or missing values with our estimates
-                if not final_usage.get("prompt_tokens") or final_usage.get("prompt_tokens") == 0:
-                    final_usage["prompt_tokens"] = estimated_prompt_tokens
-                    logger.debug(f"🔧 Replaced zero/missing prompt_tokens with estimate: {estimated_prompt_tokens}")
-                
-                if not final_usage.get("completion_tokens") or final_usage.get("completion_tokens") == 0:
-                    final_usage["completion_tokens"] = estimated_completion_tokens
-                    logger.debug(f"🔧 Replaced zero/missing completion_tokens with estimate: {estimated_completion_tokens}")
-                
-                if not final_usage.get("total_tokens") or final_usage.get("total_tokens") == 0:
-                    final_usage["total_tokens"] = final_usage.get("prompt_tokens", estimated_prompt_tokens) + final_usage.get("completion_tokens", estimated_completion_tokens)
-                    logger.debug(f"🔧 Replaced zero/missing total_tokens with calculated value: {final_usage['total_tokens']}")
-                
-                response_json["usage"] = final_usage
-                logger.debug(f"🔧 Preserved upstream usage with replacements: {final_usage}")
-            else:
-                # No upstream usage, provide our estimates
-                response_json["usage"] = {
-                    "prompt_tokens": estimated_prompt_tokens,
-                    "completion_tokens": estimated_completion_tokens,
-                    "total_tokens": estimated_total_tokens
-                }
-                logger.debug(f"🔧 No upstream usage found, using estimates")
-            
-            # Log token statistics
-            actual_usage = response_json["usage"]
-            logger.info("=" * 60)
-            logger.info(f"📊 Token Usage Statistics - Model: {body.model}")
-            logger.info(f"   Input Tokens: {actual_usage.get('prompt_tokens', 0)}")
-            logger.info(f"   Output Tokens: {actual_usage.get('completion_tokens', 0)}")
-            logger.info(f"   Total Tokens: {actual_usage.get('total_tokens', 0)}")
-            logger.info(f"   Duration: {elapsed_time:.2f}s")
-            logger.info("=" * 60)
-            
-            if has_function_call:
-                content = response_json["choices"][0]["message"]["content"]
-                logger.debug(f"🔧 Complete response content: {repr(content)}")
-                
-                parsed_tools = parse_function_calls_xml(content, GLOBAL_TRIGGER_SIGNAL)
-                logger.debug(f"🔧 XML parsing result: {parsed_tools}")
-                
-                if parsed_tools:
-                    logger.debug(f"🔧 Successfully parsed {len(parsed_tools)} tool calls")
-                    tool_calls = []
-                    for tool in parsed_tools:
-                        tool_call_id = f"call_{uuid.uuid4().hex}"
-                        store_tool_call_mapping(
-                            tool_call_id,
-                            tool["name"],
-                            tool["args"],
-                            f"Calling tool {tool['name']}"
-                        )
-                        tool_calls.append({
-                            "id": tool_call_id,
-                            "type": "function",
-                            "function": {
-                                "name": tool["name"],
-                                "arguments": json.dumps(tool["args"])
-                            }
-                        })
-                    logger.debug(f"🔧 Converted tool_calls: {tool_calls}")
-                    
-                    response_json["choices"][0]["message"] = {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": tool_calls,
-                    }
-                    response_json["choices"][0]["finish_reason"] = "tool_calls"
-                    logger.debug(f"🔧 Function call conversion completed")
-                else:
-                    logger.debug(f"🔧 No tool calls detected, returning original content (including think blocks)")
-            else:
-                logger.debug(f"🔧 No function calls detected or conversion conditions not met")
-            
-            return JSONResponse(content=response_json)
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {_api_key}" if app_config.features.key_passthrough else f"Bearer {upstream['api_key']}",
+                "Accept": "application/json"
+            }
 
-        except httpx.HTTPStatusError as e:
-            logger.error(f"❌ Upstream service response error: status_code={e.response.status_code}")
-            logger.error(f"❌ Upstream error details: {e.response.text}")
+            logger.info(f"📝 Attempting upstream {upstream_idx + 1}/{len(upstreams)}: {upstream['name']} (priority: {upstream.get('priority', 0)})")
+            logger.info(f"📝 Model: {request_body_dict.get('model', 'unknown')}, Messages: {len(request_body_dict.get('messages', []))}")
             
-            if e.response.status_code == 400:
-                error_response = {
-                    "error": {
-                        "message": "Invalid request parameters",
-                        "type": "invalid_request_error",
-                        "code": "bad_request"
-                    }
-                }
-            elif e.response.status_code == 401:
-                error_response = {
-                    "error": {
-                        "message": "Authentication failed",
-                        "type": "authentication_error", 
-                        "code": "unauthorized"
-                    }
-                }
-            elif e.response.status_code == 403:
-                error_response = {
-                    "error": {
-                        "message": "Access forbidden",
-                        "type": "permission_error",
-                        "code": "forbidden"
-                    }
-                }
-            elif e.response.status_code == 429:
-                error_response = {
-                    "error": {
-                        "message": "Rate limit exceeded",
-                        "type": "rate_limit_error",
-                        "code": "rate_limit_exceeded"
-                    }
-                }
-            elif e.response.status_code >= 500:
-                error_response = {
-                    "error": {
-                        "message": "Upstream service temporarily unavailable",
-                        "type": "service_error",
-                        "code": "upstream_error"
-                    }
-                }
-            else:
-                error_response = {
-                    "error": {
-                        "message": "Request processing failed",
-                        "type": "api_error",
-                        "code": "unknown_error"
-                    }
-                }
+            try:
+                logger.debug(f"🔧 Sending upstream request to: {upstream_url}")
+                logger.debug(f"🔧 has_function_call: {has_function_call}")
+                logger.debug(f"🔧 Request body contains tools: {bool(body.tools)}")
+                
+                upstream_response = await http_client.post(
+                    upstream_url, json=request_body_dict, headers=headers, timeout=app_config.server.timeout
+                )
+                upstream_response.raise_for_status() # If status code is 4xx or 5xx, raise exception
+                
+                response_json = upstream_response.json()
+                logger.debug(f"🔧 Upstream response status code: {upstream_response.status_code}")
             
-            return JSONResponse(content=error_response, status_code=e.response.status_code)
+                # Count output tokens and handle usage
+                completion_text = ""
+                if response_json.get("choices") and len(response_json["choices"]) > 0:
+                    content = response_json["choices"][0].get("message", {}).get("content")
+                    if content:
+                        completion_text = content
+            
+                # Calculate our estimated tokens
+                estimated_completion_tokens = token_counter.count_text_tokens(completion_text, body.model) if completion_text else 0
+                estimated_prompt_tokens = prompt_tokens
+                estimated_total_tokens = estimated_prompt_tokens + estimated_completion_tokens
+                elapsed_time = time.time() - start_time
+            
+                # Check if upstream provided usage and respect it
+                upstream_usage = response_json.get("usage", {})
+                if upstream_usage:
+                    # Preserve upstream's usage structure and only replace zero values
+                    final_usage = upstream_usage.copy()
+                    
+                    # Replace zero or missing values with our estimates
+                    if not final_usage.get("prompt_tokens") or final_usage.get("prompt_tokens") == 0:
+                        final_usage["prompt_tokens"] = estimated_prompt_tokens
+                        logger.debug(f"🔧 Replaced zero/missing prompt_tokens with estimate: {estimated_prompt_tokens}")
+                    
+                    if not final_usage.get("completion_tokens") or final_usage.get("completion_tokens") == 0:
+                        final_usage["completion_tokens"] = estimated_completion_tokens
+                        logger.debug(f"🔧 Replaced zero/missing completion_tokens with estimate: {estimated_completion_tokens}")
+                    
+                    if not final_usage.get("total_tokens") or final_usage.get("total_tokens") == 0:
+                        final_usage["total_tokens"] = final_usage.get("prompt_tokens", estimated_prompt_tokens) + final_usage.get("completion_tokens", estimated_completion_tokens)
+                        logger.debug(f"🔧 Replaced zero/missing total_tokens with calculated value: {final_usage['total_tokens']}")
+                    
+                    response_json["usage"] = final_usage
+                    logger.debug(f"🔧 Preserved upstream usage with replacements: {final_usage}")
+                else:
+                    # No upstream usage, provide our estimates
+                    response_json["usage"] = {
+                        "prompt_tokens": estimated_prompt_tokens,
+                        "completion_tokens": estimated_completion_tokens,
+                        "total_tokens": estimated_total_tokens
+                    }
+                    logger.debug(f"🔧 No upstream usage found, using estimates")
+            
+                # Log token statistics
+                actual_usage = response_json["usage"]
+                logger.info("=" * 60)
+                logger.info(f"📊 Token Usage Statistics - Model: {body.model}")
+                logger.info(f"   Input Tokens: {actual_usage.get('prompt_tokens', 0)}")
+                logger.info(f"   Output Tokens: {actual_usage.get('completion_tokens', 0)}")
+                logger.info(f"   Total Tokens: {actual_usage.get('total_tokens', 0)}")
+                logger.info(f"   Duration: {elapsed_time:.2f}s")
+                logger.info("=" * 60)
+            
+                if has_function_call:
+                    content = response_json["choices"][0]["message"]["content"]
+                    logger.debug(f"🔧 Complete response content: {repr(content)}")
+                    
+                    parsed_tools = parse_function_calls_xml(content, GLOBAL_TRIGGER_SIGNAL)
+                    logger.debug(f"🔧 XML parsing result: {parsed_tools}")
+                    
+                    if parsed_tools:
+                        logger.debug(f"🔧 Successfully parsed {len(parsed_tools)} tool calls")
+                        tool_calls = []
+                        for tool in parsed_tools:
+                            tool_call_id = f"call_{uuid.uuid4().hex}"
+                            store_tool_call_mapping(
+                                tool_call_id,
+                                tool["name"],
+                                tool["args"],
+                                f"Calling tool {tool['name']}"
+                            )
+                            tool_calls.append({
+                                "id": tool_call_id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool["name"],
+                                    "arguments": json.dumps(tool["args"])
+                                }
+                            })
+                        logger.debug(f"🔧 Converted tool_calls: {tool_calls}")
+                        
+                        response_json["choices"][0]["message"] = {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": tool_calls,
+                        }
+                        response_json["choices"][0]["finish_reason"] = "tool_calls"
+                        logger.debug(f"🔧 Function call conversion completed")
+                    else:
+                        logger.debug(f"🔧 No tool calls detected, returning original content (including think blocks)")
+                else:
+                    logger.debug(f"🔧 No function calls detected or conversion conditions not met")
+            
+                return JSONResponse(content=response_json)
+
+            except httpx.HTTPStatusError as e:
+                logger.warning(f"⚠️  Upstream {upstream['name']} failed: status_code={e.response.status_code}")
+                logger.debug(f"🔧 Error details: {e.response.text}")
+                
+                last_error = e
+                
+                # Check if we should retry with next upstream
+                # Don't retry for client errors (400, 401, 403) - these won't succeed with different upstream
+                if e.response.status_code in [400, 401, 403]:
+                    logger.error(f"❌ Client error from {upstream['name']}, not retrying other upstreams")
+                    if e.response.status_code == 400:
+                        error_response = {"error": {"message": "Invalid request parameters", "type": "invalid_request_error", "code": "bad_request"}}
+                    elif e.response.status_code == 401:
+                        error_response = {"error": {"message": "Authentication failed", "type": "authentication_error", "code": "unauthorized"}}
+                    elif e.response.status_code == 403:
+                        error_response = {"error": {"message": "Access forbidden", "type": "permission_error", "code": "forbidden"}}
+                    return JSONResponse(content=error_response, status_code=e.response.status_code)
+                
+                # For 429 and 5xx errors, try next upstream if available
+                if upstream_idx < len(upstreams) - 1:
+                    logger.info(f"🔄 Trying next upstream service (failover)...")
+                    continue
+                else:
+                    # All upstreams failed
+                    logger.error(f"❌ All {len(upstreams)} upstream services failed")
+                    if e.response.status_code == 429:
+                        error_response = {"error": {"message": "Rate limit exceeded on all upstreams", "type": "rate_limit_error", "code": "rate_limit_exceeded"}}
+                    elif e.response.status_code >= 500:
+                        error_response = {"error": {"message": "All upstream services temporarily unavailable", "type": "service_error", "code": "upstream_error"}}
+                    else:
+                        error_response = {"error": {"message": "Request processing failed on all upstreams", "type": "api_error", "code": "unknown_error"}}
+                    return JSONResponse(content=error_response, status_code=e.response.status_code)
+            
+            except Exception as e:
+                logger.error(f"❌ Unexpected error with {upstream['name']}: {e}")
+                last_error = e
+                if upstream_idx < len(upstreams) - 1:
+                    logger.info(f"🔄 Trying next upstream service...")
+                    continue
+                else:
+                    logger.error(f"❌ All upstreams failed with errors")
+                    return JSONResponse(
+                        status_code=500,
+                        content={"error": {"message": "All upstream services failed", "type": "service_error", "code": "all_upstreams_failed"}}
+                    )
         
     else:
+        # Streaming: use the highest priority upstream (first in list)
+        upstream = upstreams[0]
+        upstream_url = f"{upstream['base_url']}/chat/completions"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {_api_key}" if app_config.features.key_passthrough else f"Bearer {upstream['api_key']}",
+            "Accept": "text/event-stream"
+        }
+        
+        logger.info(f"📝 Streaming to upstream: {upstream['name']} (priority: {upstream.get('priority', 0)})")
+        
         async def stream_with_token_count():
             completion_tokens = 0
             completion_text = ""
@@ -1394,7 +1410,7 @@ async def stream_proxy_with_fc_transform(url: str, body: dict, headers: dict, mo
             logger.debug("🔧 Upstream closed connection prematurely, ending stream response")
             return
         return
-# setattr()``
+    
     detector = StreamingFunctionCallDetector(trigger_signal)
 
     def _prepare_tool_calls(parsed_tools: List[Dict[str, Any]]):
