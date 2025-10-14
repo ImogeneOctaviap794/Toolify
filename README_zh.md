@@ -55,7 +55,20 @@ Toolify 是一个中间件代理，旨在为那些本身不支持函数调用功
    cp config.example.yaml config.yaml
    ```
 
-   编辑 `config.yaml`。`docker-compose.yml` 文件已配置为将此文件挂载到容器中。
+   编辑 `config.yaml`。特别注意添加 `admin_authentication` 配置（用于 Web 管理界面）：
+
+   ```yaml
+   admin_authentication:
+     username: "admin"
+     password: "$2b$12$..."  # 使用 init_admin.py 生成
+     jwt_secret: "your-secure-random-jwt-secret-min-32-chars"
+   ```
+
+   或使用 `init_admin.py` 脚本自动生成：
+
+   ```bash
+   python init_admin.py
+   ```
 
 3. **启动服务：**
 
@@ -63,7 +76,12 @@ Toolify 是一个中间件代理，旨在为那些本身不支持函数调用功
    docker-compose up -d --build
    ```
 
-   这将构建 Docker 镜像并以后台模式启动 Toolify 服务，可通过 `http://localhost:8000` 访问。
+   这将构建 Docker 镜像（包含前端管理界面）并以后台模式启动 Toolify 服务。
+
+   - API 服务：`http://localhost:8000`
+   - 管理界面：`http://localhost:8000/admin`
+
+   **注意**：Docker 构建时会自动编译前端，首次构建可能需要几分钟时间。
 
 ### 选项 2: 使用 Python
 

@@ -6,7 +6,24 @@ Toolify 现在提供了一个现代化的 Web 管理界面，让您可以通过�
 
 ## 初始设置
 
-### 1. 安装依赖
+### 1. 选择部署方式
+
+#### 方式 A：Docker 部署（推荐）
+
+```bash
+# 1. 配置文件
+cp config.example.yaml config.yaml
+
+# 2. 初始化管理员账号（在宿主机上运行）
+python init_admin.py
+
+# 3. 构建并启动（会自动构建前端）
+docker-compose up -d --build
+```
+
+Docker 部署会自动完成前端构建，无需手动操作。
+
+#### 方式 B：直接运行
 
 ```bash
 # 安装 Python 依赖（如果还没安装）
@@ -34,6 +51,14 @@ python init_admin.py
 按照提示输入新的用户名和密码，脚本会自动更新 `config.yaml`。
 
 ## 启动服务
+
+### Docker 方式
+
+```bash
+docker-compose up -d --build
+```
+
+### 直接运行方式
 
 ```bash
 python main.py
@@ -134,6 +159,12 @@ npm run build
 
 ### 无法访问管理界面
 
+**Docker 部署**：
+1. 检查容器是否运行：`docker ps | grep toolify`
+2. 查看容器日志：`docker logs toolify`
+3. 进入容器检查：`docker exec -it toolify ls -la frontend/dist`
+
+**直接运行**：
 1. 检查服务是否正常运行：`curl http://localhost:8000/`
 2. 确认前端已构建：检查 `frontend/dist` 目录是否存在
 3. 查看日志文件：`tail -f toolify.log`

@@ -55,7 +55,20 @@ This is the recommended way for easy deployment.
    cp config.example.yaml config.yaml
    ```
 
-   Edit `config.yaml`. The `docker-compose.yml` file is configured to mount this file into the container.
+   Edit `config.yaml`. Make sure to add `admin_authentication` configuration (for the web admin interface):
+
+   ```yaml
+   admin_authentication:
+     username: "admin"
+     password: "$2b$12$..."  # Use init_admin.py to generate
+     jwt_secret: "your-secure-random-jwt-secret-min-32-chars"
+   ```
+
+   Or use the `init_admin.py` script to generate automatically:
+
+   ```bash
+   python init_admin.py
+   ```
 
 3. **Start the service:**
 
@@ -63,7 +76,12 @@ This is the recommended way for easy deployment.
    docker-compose up -d --build
    ```
 
-   This will build the Docker image and start the Toolify service in detached mode, accessible at `http://localhost:8000`.
+   This will build the Docker image (including the frontend admin interface) and start the Toolify service in detached mode.
+
+   - API Service: `http://localhost:8000`
+   - Admin Interface: `http://localhost:8000/admin`
+
+   **Note**: The frontend will be compiled during Docker build, which may take a few minutes on first build.
 
 ### Option 2: Using Python
 
