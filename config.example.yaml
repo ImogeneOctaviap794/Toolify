@@ -9,7 +9,8 @@ server:
 
 # Upstream OpenAI compatible service configuration
 upstream_services:
-  - name: "openai"
+  - name: "openai-primary"
+    service_type: "openai"  # Service type: openai, google, anthropic, etc.
     base_url: "https://api.openai.com/v1"
     api_key: "your-openai-api-key-here"
     description: "OpenAI Official Service"
@@ -24,6 +25,7 @@ upstream_services:
       - "gpt-4o-mini"
 
   - name: "openai-backup"
+    service_type: "openai"
     base_url: "https://api.openai-proxy.com/v1"
     api_key: "your-backup-api-key-here"
     description: "OpenAI Backup Service (fallback)"
@@ -33,12 +35,13 @@ upstream_services:
       - "gpt-4"
       - "gpt-4o"
 
-  - name: "google"
+  - name: "google-gemini"
+    service_type: "google"
     base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
     api_key: "your-google-api-key-here"
     description: "Google Gemini Service"
     is_default: false
-    priority: 100
+    priority: 80  # High priority for Google services
     models:
       # Use alias "gemini-2.5" to randomly select one of the following models
       - "gemini-2.5:gemini-2.5-pro"

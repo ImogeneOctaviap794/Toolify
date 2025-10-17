@@ -19,6 +19,7 @@ class ServerConfig(BaseModel):
 class UpstreamService(BaseModel):
     """Upstream service configuration"""
     name: str = Field(description="Service name")
+    service_type: str = Field(default="openai", description="Service type: openai, google, anthropic, etc.")
     base_url: str = Field(description="Service base URL")
     api_key: str = Field(description="API key")
     models: List[str] = Field(default_factory=list, description="List of supported models")

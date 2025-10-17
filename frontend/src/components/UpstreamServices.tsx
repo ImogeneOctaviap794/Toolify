@@ -21,11 +21,12 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
   const addService = () => {
     const newService = {
       name: `service-${config.upstream_services.length + 1}`,
+      service_type: 'openai',
       base_url: 'https://api.example.com/v1',
       api_key: '',
       description: '',
       is_default: false,
-      priority: config.upstream_services.length,
+      priority: config.upstream_services.length * 10,
       models: []
     }
     setConfig({
@@ -220,6 +221,23 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                     onChange={(e) => updateService(index, 'name', e.target.value)}
                     placeholder="服务名称"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>服务类型</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={service.service_type || 'openai'}
+                    onChange={(e) => updateService(index, 'service_type', e.target.value)}
+                  >
+                    <option value="openai">OpenAI</option>
+                    <option value="google">Google</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="other">其他</option>
+                  </select>
+                  <p className="text-sm text-muted-foreground">
+                    服务提供商类型（仅用于标识）
+                  </p>
                 </div>
 
                 <div className="space-y-2">

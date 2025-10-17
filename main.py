@@ -844,23 +844,24 @@ def find_upstream(model_name: str) -> tuple[List[Dict[str, Any]], str]:
     
     # Handle model passthrough mode
     if app_config.features.model_passthrough:
-        logger.info("🔄 Model passthrough mode is active. Forwarding to 'openai' service.")
-        openai_services = []
+        logger.info("🔄 Model passthrough mode is active. Using all configured services.")
+        all_services = []
         for service in app_config.upstream_services:
-            if service.name == "openai":
-                service_dict = service.model_dump()
-                # Skip services with empty API keys
-                if not service_dict.get("api_key") or service_dict.get("api_key").strip() == "":
-                    logger.warning(f"⚠️  Skipping 'openai' service with empty API key")
-                    continue
-                openai_services.append(service_dict)
+            service_dict = service.model_dump()
+            # Skip services with empty API keys
+            if not service_dict.get("api_key") or service_dict.get("api_key").strip() == "":
+                logger.warning(f"⚠️  Skipping service '{service_dict.get('name')}' with empty API key")
+                continue
+            all_services.append(service_dict)
         
-        if openai_services:
+        if all_services:
             # Sort by priority (higher number = higher priority)
-            openai_services = sorted(openai_services, key=lambda x: x.get('priority', 0), reverse=True)
-            return openai_services, model_name
+            all_services = sorted(all_services, key=lambda x: x.get('priority', 0), reverse=True)
+            priority_list = [f"{s['name']}({s.get('priority', 0)})" for s in all_services]
+            logger.info(f"📋 Found {len(all_services)} valid services, priority order: {priority_list}")
+            return all_services, model_name
         else:
-            raise HTTPException(status_code=500, detail="Configuration error: 'model_passthrough' is enabled, but no valid 'openai' service with API key was found.")
+            raise HTTPException(status_code=500, detail="配置错误：model_passthrough 模式下没有找到有效的上游服务")
 
     # Default routing logic
     chosen_model_entry = model_name
