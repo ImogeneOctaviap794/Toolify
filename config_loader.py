@@ -260,14 +260,22 @@ class ConfigLoader:
         """Get default service configuration (highest priority service)"""
         config = self.config
         
-        # Filter out services without models or API keys
+        if not config.upstream_services or len(config.upstream_services) == 0:
+            raise ValueError("上游服务列表为空，无法启动服务")
+        
+        # First try to find services with both models and API keys
         valid_services = [
             s for s in config.upstream_services 
             if s.models and len(s.models) > 0 and s.api_key and s.api_key.strip()
         ]
         
+        # If no fully valid service, use the highest priority service anyway
+        # (validation will happen at request time)
         if not valid_services:
-            raise ValueError("没有可用的上游服务配置（需要至少一个包含模型和 API Key 的服务）")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("⚠️  没有完全配置好的服务，使用优先级最高的服务作为默认（实际使用时需要完善配置）")
+            valid_services = config.upstream_services
         
         # Get service with highest priority (largest number)
         highest_priority_service = max(valid_services, key=lambda s: s.priority)
