@@ -232,8 +232,6 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                   >
                     <option value="openai">OpenAI</option>
                     <option value="google">Google</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="other">其他</option>
                   </select>
                   <p className="text-sm text-muted-foreground">
                     服务提供商类型（仅用于标识）
