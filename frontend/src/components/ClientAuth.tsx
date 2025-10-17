@@ -46,33 +46,40 @@ export default function ClientAuth({ config, setConfig }: ClientAuthProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>客户端认证配置</CardTitle>
-        <CardDescription>
+    <Card className="shadow-md border-gray-200">
+      <CardHeader className="bg-gradient-to-r from-white to-gray-50 border-b border-gray-100">
+        <CardTitle className="text-xl text-gray-800 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+          客户端认证配置
+        </CardTitle>
+        <CardDescription className="text-gray-600">
           管理允许访问 Toolify Admin 服务的客户端 API 密钥
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3">
+      <CardContent className="space-y-6 p-6">
+        <div className="space-y-4">
           {config.client_authentication.allowed_keys.map((key, index) => (
-            <div key={index} className="flex items-center gap-2">
+            <div key={index} className="flex items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200">
               <div className="flex-1 space-y-2">
-                <Label htmlFor={`key-${index}`}>API Key {index + 1}</Label>
+                <Label htmlFor={`key-${index}`} className="font-medium text-gray-700 flex items-center gap-2">
+                  <span className="text-yellow-500">🔑</span>
+                  API Key {index + 1}
+                </Label>
                 <Input
                   id={`key-${index}`}
                   type="text"
                   value={key}
                   onChange={(e) => updateKey(index, e.target.value)}
                   placeholder="sk-your-api-key-here"
+                  className="font-mono text-sm border-gray-300 focus:border-blue-400 focus:ring-blue-500"
                 />
               </div>
               {config.client_authentication.allowed_keys.length > 1 && (
                 <Button
-                  variant="destructive"
+                  variant="ghost"
                   size="icon"
                   onClick={() => removeKey(index)}
-                  className="mt-8"
+                  className="hover:bg-red-50 hover:text-red-600 transition-colors mt-7"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -81,19 +88,39 @@ export default function ClientAuth({ config, setConfig }: ClientAuthProps) {
           ))}
         </div>
 
-        <Button onClick={addKey} variant="outline" className="w-full">
+        <Button 
+          onClick={addKey} 
+          className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-sm hover:shadow-md transition-all"
+        >
           <Plus className="w-4 h-4 mr-2" />
-          添加 API Key
+          添加新的 API Key
         </Button>
 
-        <div className="bg-muted/50 border rounded-lg p-4 mt-6">
-          <h4 className="font-medium mb-2">使用说明</h4>
-          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-            <li>这些 API Key 用于客户端访问 Toolify 服务时的身份验证</li>
-            <li>请妥善保管这些密钥，不要泄露给未授权的用户</li>
-            <li>建议使用长度至少 32 位的随机字符串作为 API Key</li>
-            <li>客户端需要在请求头中携带：Authorization: Bearer YOUR_API_KEY</li>
-          </ul>
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 mt-6">
+          <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <span className="text-blue-500">📋</span>
+            使用说明
+          </h4>
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5">✓</span>
+              <p className="text-sm text-gray-600">这些 API Key 用于客户端访问 Toolify 服务时的身份验证</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-orange-500 mt-0.5">⚠️</span>
+              <p className="text-sm text-gray-600">请妥善保管这些密钥，不要泄露给未授权的用户</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-blue-500 mt-0.5">💡</span>
+              <p className="text-sm text-gray-600">建议使用长度至少 32 位的随机字符串作为 API Key</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-purple-500 mt-0.5">📡</span>
+              <p className="text-sm text-gray-600 font-mono bg-white px-2 py-1 rounded border border-gray-200 inline-block">
+                Authorization: Bearer YOUR_API_KEY
+              </p>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
