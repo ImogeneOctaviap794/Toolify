@@ -163,7 +163,8 @@ Toolify Admin 支持为同一个模型配置多个上游渠道，并根据优先
 
 ### 功能特点
 
-- **优先级机制**：为每个服务配置 `priority` 值（数字越小优先级越高，0 为最高）
+- **优先级机制**：为每个服务配置 `priority` 值（数字越大优先级越高，100 比 50 优先）
+- **无需默认服务**：移除 `is_default` 强制要求，未匹配模型时自动使用优先级最高的服务
 - **自动故障转移**：当高优先级渠道失败时，自动尝试下一优先级的渠道
 - **智能重试策略**：
   - 对于 429（限流）和 5xx（服务器错误）：自动切换到备用渠道
@@ -179,8 +180,7 @@ upstream_services:
   - name: "openai-primary"
     base_url: "https://api.openai.com/v1"
     api_key: "your-primary-key"
-    priority: 0  # 最高优先级
-    is_default: true
+    priority: 100  # 最高优先级（数字越大越优先）
     models:
       - "gpt-4"
       - "gpt-4o"
@@ -190,8 +190,7 @@ upstream_services:
   - name: "openai-backup"
     base_url: "https://api.openai-proxy.com/v1"
     api_key: "your-backup-key"
-    priority: 1  # 第二优先级
-    is_default: false
+    priority: 50  # 第二优先级
     models:
       - "gpt-4"
       - "gpt-4o"
@@ -200,8 +199,7 @@ upstream_services:
   - name: "openai-fallback"
     base_url: "https://another-proxy.com/v1"
     api_key: "your-fallback-key"
-    priority: 2
-    is_default: false
+    priority: 10
     models:
       - "gpt-4"
 ```
@@ -209,16 +207,18 @@ upstream_services:
 ### 工作流程
 
 1. 请求 `gpt-4` 模型
-2. 系统首先尝试 `priority: 0` 的渠道（openai-primary）
-3. 如果返回 429 或 500+ 错误，自动切换到 `priority: 1` 的渠道（openai-backup）
-4. 如果仍然失败，继续尝试 `priority: 2` 的渠道（openai-fallback）
+2. 系统首先尝试 `priority: 100` 的渠道（openai-primary）- 最高优先级
+3. 如果返回 429 或 500+ 错误，自动切换到 `priority: 50` 的渠道（openai-backup）
+4. 如果仍然失败，继续尝试 `priority: 10` 的渠道（openai-fallback）
 5. 只有所有渠道都失败时才返回错误给客户端
 
 ### 注意事项
 
+- **优先级规则**：数字越大优先级越高（建议使用 100/50/10 这样的间隔，便于后续插入中间优先级）
 - **流式请求**：由于流式响应的特性，始终使用最高优先级的渠道（无法中途切换）
 - **相同优先级**：多个服务可以有相同的优先级，此时按配置文件中的顺序尝试
 - **模型匹配**：只有配置了相同模型的服务才会参与故障转移
+- **is_default 已弃用**：不再需要设置默认服务，系统自动使用优先级最高的服务作为兜底
 
 ## Web 管理界面
 

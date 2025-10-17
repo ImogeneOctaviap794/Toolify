@@ -23,8 +23,8 @@ class UpstreamService(BaseModel):
     api_key: str = Field(description="API key")
     models: List[str] = Field(default_factory=list, description="List of supported models")
     description: str = Field(default="", description="Service description")
-    is_default: bool = Field(default=False, description="Is default service")
-    priority: int = Field(default=0, description="Priority level (lower number = higher priority, 0 is highest)")
+    is_default: bool = Field(default=False, description="Is default service (deprecated, use priority instead)")
+    priority: int = Field(default=0, description="Priority level (higher number = higher priority)")
     
     @field_validator('base_url')
     def validate_base_url(cls, v):
@@ -136,16 +136,9 @@ class AppConfig(BaseModel):
             openai_service = next((s for s in v if s.name == 'openai'), None)
             if not openai_service:
                 raise ValueError("启用 model_passthrough 时必须配置名为 'openai' 的上游服务")
-        else:
-            # In normal mode, allow empty models list (will be skipped at runtime)
-            # Just log a warning for services without models
-            pass
         
-        default_services = [service for service in v if service.is_default]
-        if len(default_services) == 0:
-            raise ValueError('至少需要一个默认上游服务（is_default: true）')
-        if len(default_services) > 1:
-            raise ValueError('只能有一个上游服务标记为默认服务')
+        # is_default is now deprecated, priority is used instead
+        # No need to validate is_default anymore
         
         # Validate model format and collect aliases
         # Note: Now we allow same model in multiple services (for multi-channel support)
@@ -257,25 +250,36 @@ class ConfigLoader:
                             alias_mapping[alias] = []
                         alias_mapping[alias].append(model_entry)
         
-        # Sort services by priority (lower number = higher priority)
+        # Sort services by priority (higher number = higher priority)
         for model_entry in model_mapping:
-            model_mapping[model_entry] = sorted(model_mapping[model_entry], key=lambda x: x['priority'])
+            model_mapping[model_entry] = sorted(model_mapping[model_entry], key=lambda x: x['priority'], reverse=True)
         
         return model_mapping, alias_mapping
     
     def get_default_service(self) -> Dict[str, Any]:
-        """Get default service configuration"""
+        """Get default service configuration (highest priority service)"""
         config = self.config
-        for service in config.upstream_services:
-            if service.is_default:
-                return {
-                    "name": service.name,
-                    "base_url": service.base_url,
-                    "api_key": service.api_key,
-                    "description": service.description,
-                    "is_default": service.is_default
-                }
-        raise ValueError("No default service configured")
+        
+        # Filter out services without models or API keys
+        valid_services = [
+            s for s in config.upstream_services 
+            if s.models and len(s.models) > 0 and s.api_key and s.api_key.strip()
+        ]
+        
+        if not valid_services:
+            raise ValueError("没有可用的上游服务配置（需要至少一个包含模型和 API Key 的服务）")
+        
+        # Get service with highest priority (largest number)
+        highest_priority_service = max(valid_services, key=lambda s: s.priority)
+        
+        return {
+            "name": highest_priority_service.name,
+            "base_url": highest_priority_service.base_url,
+            "api_key": highest_priority_service.api_key,
+            "description": highest_priority_service.description,
+            "is_default": highest_priority_service.is_default,
+            "priority": highest_priority_service.priority
+        }
     
     def get_allowed_client_keys(self) -> Set[str]:
         """Get set of allowed client keys"""

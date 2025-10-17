@@ -163,7 +163,8 @@ Toolify Admin supports configuring multiple upstream channels for the same model
 
 ### Features
 
-- **Priority Mechanism**: Configure `priority` value for each service (lower number = higher priority, 0 is highest)
+- **Priority Mechanism**: Configure `priority` value for each service (higher number = higher priority, 100 > 50)
+- **No Default Service Required**: Removed `is_default` requirement, automatically uses highest priority service as fallback
 - **Automatic Failover**: Automatically try next priority channel when high-priority channel fails
 - **Smart Retry Strategy**:
   - For 429 (rate limit) and 5xx (server errors): Automatically switch to backup channel
@@ -179,8 +180,7 @@ upstream_services:
   - name: "openai-primary"
     base_url: "https://api.openai.com/v1"
     api_key: "your-primary-key"
-    priority: 0  # Highest priority
-    is_default: true
+    priority: 100  # Highest priority (higher number = higher priority)
     models:
       - "gpt-4"
       - "gpt-4o"
@@ -190,8 +190,7 @@ upstream_services:
   - name: "openai-backup"
     base_url: "https://api.openai-proxy.com/v1"
     api_key: "your-backup-key"
-    priority: 1  # Second priority
-    is_default: false
+    priority: 50  # Second priority
     models:
       - "gpt-4"
       - "gpt-4o"
@@ -200,8 +199,7 @@ upstream_services:
   - name: "openai-fallback"
     base_url: "https://another-proxy.com/v1"
     api_key: "your-fallback-key"
-    priority: 2
-    is_default: false
+    priority: 10
     models:
       - "gpt-4"
 ```
@@ -209,16 +207,18 @@ upstream_services:
 ### Workflow
 
 1. Request `gpt-4` model
-2. System first tries `priority: 0` channel (openai-primary)
-3. If returns 429 or 500+ error, automatically switches to `priority: 1` channel (openai-backup)
-4. If still fails, continues to try `priority: 2` channel (openai-fallback)
+2. System first tries `priority: 100` channel (openai-primary) - highest priority
+3. If returns 429 or 500+ error, automatically switches to `priority: 50` channel (openai-backup)
+4. If still fails, continues to try `priority: 10` channel (openai-fallback)
 5. Only returns error to client when all channels have failed
 
 ### Notes
 
+- **Priority Rule**: Higher number = higher priority (recommend using intervals like 100/50/10 for easy insertion of intermediate priorities)
 - **Streaming Requests**: Due to the nature of streaming responses, always uses highest priority channel (cannot switch mid-stream)
 - **Same Priority**: Multiple services can have same priority, in which case they're tried in config file order
 - **Model Matching**: Only services configured with the same model participate in failover
+- **is_default Deprecated**: No longer need to set default service, system automatically uses highest priority service as fallback
 
 ## Web Admin Interface
 

@@ -856,8 +856,8 @@ def find_upstream(model_name: str) -> tuple[List[Dict[str, Any]], str]:
                 openai_services.append(service_dict)
         
         if openai_services:
-            # Sort by priority
-            openai_services = sorted(openai_services, key=lambda x: x.get('priority', 0))
+            # Sort by priority (higher number = higher priority)
+            openai_services = sorted(openai_services, key=lambda x: x.get('priority', 0), reverse=True)
             return openai_services, model_name
         else:
             raise HTTPException(status_code=500, detail="Configuration error: 'model_passthrough' is enabled, but no valid 'openai' service with API key was found.")

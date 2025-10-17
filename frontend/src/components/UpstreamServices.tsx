@@ -4,7 +4,7 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Button } from './ui/button'
 import { Switch } from './ui/switch'
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Code, Edit } from 'lucide-react'
 import { useState } from 'react'
 
 interface UpstreamServicesProps {
@@ -14,6 +14,9 @@ interface UpstreamServicesProps {
 
 export default function UpstreamServices({ config, setConfig }: UpstreamServicesProps) {
   const [expandedServices, setExpandedServices] = useState<Set<number>>(new Set([0]))
+  const [isJsonMode, setIsJsonMode] = useState(false)
+  const [jsonText, setJsonText] = useState('')
+  const [jsonError, setJsonError] = useState('')
 
   const addService = () => {
     const newService = {
@@ -73,9 +76,91 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
     setExpandedServices(newExpanded)
   }
 
+  const switchToJsonMode = () => {
+    setJsonText(JSON.stringify(config.upstream_services, null, 2))
+    setJsonError('')
+    setIsJsonMode(true)
+  }
+
+  const applyJsonChanges = () => {
+    try {
+      const parsed = JSON.parse(jsonText)
+      if (!Array.isArray(parsed)) {
+        setJsonError('JSON 必须是数组格式')
+        return
+      }
+      setConfig({
+        ...config,
+        upstream_services: parsed
+      })
+      setJsonError('')
+      setIsJsonMode(false)
+    } catch (e: any) {
+      setJsonError(`JSON 解析错误: ${e.message}`)
+    }
+  }
+
+  const cancelJsonMode = () => {
+    setIsJsonMode(false)
+    setJsonError('')
+  }
+
   return (
     <div className="space-y-4">
-      {config.upstream_services.map((service, index) => (
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="outline"
+          onClick={isJsonMode ? cancelJsonMode : switchToJsonMode}
+        >
+          {isJsonMode ? (
+            <>
+              <Edit className="w-4 h-4 mr-2" />
+              切换到表单模式
+            </>
+          ) : (
+            <>
+              <Code className="w-4 h-4 mr-2" />
+              切换到 JSON 编辑
+            </>
+          )}
+        </Button>
+      </div>
+
+      {isJsonMode ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>JSON 编辑模式</CardTitle>
+            <CardDescription>
+              直接编辑上游服务的 JSON 配置（适合高级用户）
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {jsonError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                {jsonError}
+              </div>
+            )}
+            
+            <textarea
+              className="font-mono text-sm flex min-h-[400px] w-full rounded-md border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={jsonText}
+              onChange={(e) => setJsonText(e.target.value)}
+              placeholder="在此编辑 JSON 配置..."
+            />
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={cancelJsonMode}>
+                取消
+              </Button>
+              <Button onClick={applyJsonChanges}>
+                应用 JSON 配置
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {config.upstream_services.map((service, index) => (
         <Card key={index}>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -157,7 +242,7 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                     min="0"
                   />
                   <p className="text-sm text-muted-foreground">
-                    数字越小优先级越高，0为最高
+                    数字越大优先级越高（推荐：主渠道 100，备用渠道 50）
                   </p>
                 </div>
 
@@ -209,10 +294,12 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
         </Card>
       ))}
 
-      <Button onClick={addService} variant="outline" className="w-full">
-        <Plus className="w-4 h-4 mr-2" />
-        添加上游服务
-      </Button>
+          <Button onClick={addService} variant="outline" className="w-full">
+            <Plus className="w-4 h-4 mr-2" />
+            添加上游服务
+          </Button>
+        </>
+      )}
 
       <Card>
         <CardHeader>
@@ -227,12 +314,13 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
             <div className="bg-muted/50 border rounded-lg p-4">
               <h4 className="font-medium mb-2">工作原理</h4>
               <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                <li><strong>优先级</strong>：数字越小优先级越高（0 为最高优先级）</li>
+                <li><strong>优先级</strong>：数字越大优先级越高（100 比 50 优先级高）</li>
                 <li><strong>自动故障转移</strong>：当高优先级渠道返回 429（限流）或 5xx 错误时，自动切换到下一优先级渠道</li>
                 <li><strong>同模型多渠道</strong>：可以为同一个模型配置多个服务（如 gpt-4 配置多个 OpenAI 代理）</li>
                 <li><strong>流式请求</strong>：始终使用最高优先级渠道（因为流式响应无法中途切换）</li>
                 <li><strong>客户端错误</strong>：400/401/403 等客户端错误不会触发故障转移</li>
                 <li><strong>占位符配置</strong>：可以保存空 API Key 或空模型列表的服务，系统会自动跳过，方便提前规划配置</li>
+                <li><strong>JSON 编辑</strong>：可切换到 JSON 模式快速批量编辑所有渠道配置</li>
               </ul>
             </div>
 
@@ -241,11 +329,11 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
               <pre className="text-xs text-blue-800 overflow-x-auto">
 {`upstream_services:
   - name: "openai-primary"
-    priority: 0  # 主渠道
+    priority: 100  # 主渠道（优先级最高）
     models: ["gpt-4", "gpt-4o"]
   
   - name: "openai-backup"
-    priority: 1  # 备用渠道
+    priority: 50   # 备用渠道（优先级较低）
     models: ["gpt-4", "gpt-4o"]`}
               </pre>
             </div>
