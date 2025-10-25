@@ -285,8 +285,18 @@ async def stream_openai_to_anthropic(openai_stream_generator):
                                             if "name" in func:
                                                 current_tool_call["name"] = func["name"]
                                         
-                                        # Send tool_use start event
-                                        yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': current_block_index, 'content_block': {'type': 'tool_use', 'id': current_tool_call['id'], 'name': current_tool_call['name'], 'input': {{}}}})}\n\n"
+                                    # Send tool_use start event
+                                    start_event = {
+                                        'type': 'content_block_start',
+                                        'index': current_block_index,
+                                        'content_block': {
+                                            'type': 'tool_use',
+                                            'id': current_tool_call['id'],
+                                            'name': current_tool_call['name'],
+                                            'input': {}
+                                        }
+                                    }
+                                    yield f"event: content_block_start\ndata: {json.dumps(start_event)}\n\n"
                                     
                                     # Accumulate function arguments
                                     if "function" in tool_call_delta:
