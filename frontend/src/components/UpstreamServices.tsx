@@ -76,8 +76,9 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
     if (!service.model_mapping) {
       service.model_mapping = {}
     }
-    // Add an empty mapping (user will fill in)
-    service.model_mapping[''] = ''
+    // Add a temporary unique key (user will change it)
+    const tempKey = `__new_${Date.now()}__`
+    service.model_mapping[tempKey] = ''
     setConfig({
       ...config,
       upstream_services: services
@@ -94,8 +95,10 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
     if (oldKey !== newKey && oldKey in service.model_mapping) {
       delete service.model_mapping[oldKey]
     }
-    // Set new mapping (allow empty keys temporarily for user input)
-    service.model_mapping[newKey] = newValue
+    // Only set mapping if newKey is not empty or is a temp key
+    if (newKey.trim() || newKey.startsWith('__new_')) {
+      service.model_mapping[newKey] = newValue
+    }
     setConfig({
       ...config,
       upstream_services: services
@@ -388,13 +391,13 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                   </div>
                   
                   <div className="space-y-2">
-                    {Object.entries(service.model_mapping || {}).filter(([k]) => k !== '').map(([clientModel, upstreamModel], mapIdx) => (
+                    {Object.entries(service.model_mapping || {}).map(([clientModel, upstreamModel], mapIdx) => (
                       <div key={mapIdx} className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
                         <div className="flex-1 grid grid-cols-2 gap-2 items-center">
                           <div>
                             <Input
-                              value={clientModel}
-                              onChange={(e) => updateModelMapping(index, clientModel, e.target.value, upstreamModel)}
+                              value={clientModel.startsWith('__new_') ? '' : clientModel}
+                              onChange={(e) => updateModelMapping(index, clientModel, e.target.value || clientModel, upstreamModel)}
                               placeholder="客户端请求模型"
                               className="text-sm"
                             />
