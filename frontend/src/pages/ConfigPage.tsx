@@ -4,7 +4,6 @@ import { adminApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import ServerConfig from '@/components/ServerConfig'
 import UpstreamServices from '@/components/UpstreamServices'
 import ClientAuth from '@/components/ClientAuth'
 import Features from '@/components/Features'
@@ -13,7 +12,7 @@ import { AlertCircle, CheckCircle2, LogOut, Save, RefreshCw } from 'lucide-react
 export default function ConfigPage() {
   const { config, isLoading, error, setConfig, setLoading, setError } = useConfigStore()
   const logout = useAuthStore((state) => state.logout)
-  const [activeTab, setActiveTab] = useState('server')
+  const [activeTab, setActiveTab] = useState('upstream')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -92,7 +91,7 @@ export default function ConfigPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                  Toolify Admin
+                  Toolify-code
                 </h1>
                 <p className="text-sm text-gray-500">
                   智能服务配置管理平台
@@ -143,10 +142,7 @@ export default function ConfigPage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-12 bg-white shadow-sm border border-gray-200">
-            <TabsTrigger value="server" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-sm">
-              <span className="font-medium">🖥️ 服务器</span>
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 h-12 bg-white shadow-sm border border-gray-200">
             <TabsTrigger value="upstream" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-sm">
               <span className="font-medium">🔗 上游服务</span>
             </TabsTrigger>
@@ -157,10 +153,6 @@ export default function ConfigPage() {
               <span className="font-medium">⚙️ 功能</span>
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="server">
-            <ServerConfig config={config} setConfig={setConfig} />
-          </TabsContent>
 
           <TabsContent value="upstream">
             <UpstreamServices config={config} setConfig={setConfig} />
