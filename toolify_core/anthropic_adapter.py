@@ -234,35 +234,35 @@ async def stream_openai_to_anthropic(openai_stream_generator):
                         yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
                         logger.debug("🔧 Sent message_stop event")
                         break
-                elif line_data:
-                    # Handle multiple JSON objects in one line (split by newline if present)
-                    json_parts = line_data.split('\n')
-                    chunk_json = None
-                    
-                    for json_part in json_parts:
-                        json_part = json_part.strip()
-                        if not json_part:
-                            continue
+                    elif line_data:
+                        # Handle multiple JSON objects in one line (split by newline if present)
+                        json_parts = line_data.split('\n')
+                        chunk_json = None
                         
-                        try:
-                            chunk_json = json.loads(json_part)
-                            # Use the last valid JSON (most recent data)
-                        except json.JSONDecodeError as e:
-                            # Try to extract the first complete JSON object
-                            try:
-                                # Find the end of first JSON object
-                                decoder = json.JSONDecoder()
-                                obj, idx = decoder.raw_decode(json_part)
-                                chunk_json = obj
-                                # Ignore the extra data after first JSON
-                                if idx < len(json_part):
-                                    logger.debug(f"🔧 Extracted first JSON from multi-object chunk (ignored {len(json_part) - idx} chars)")
-                            except:
-                                logger.warning(f"⚠️ Failed to parse JSON: {e}, data: {json_part[:200]}")
+                        for json_part in json_parts:
+                            json_part = json_part.strip()
+                            if not json_part:
                                 continue
-                    
-                    if not chunk_json:
-                        continue
+                            
+                            try:
+                                chunk_json = json.loads(json_part)
+                                # Use the last valid JSON (most recent data)
+                            except json.JSONDecodeError as e:
+                                # Try to extract the first complete JSON object
+                                try:
+                                    # Find the end of first JSON object
+                                    decoder = json.JSONDecoder()
+                                    obj, idx = decoder.raw_decode(json_part)
+                                    chunk_json = obj
+                                    # Ignore the extra data after first JSON
+                                    if idx < len(json_part):
+                                        logger.debug(f"🔧 Extracted first JSON from multi-object chunk (ignored {len(json_part) - idx} chars)")
+                                except:
+                                    logger.warning(f"⚠️ Failed to parse JSON: {e}, data: {json_part[:200]}")
+                                    continue
+                        
+                        if not chunk_json:
+                            continue
                         
                         if "choices" in chunk_json and len(chunk_json["choices"]) > 0:
                             choice = chunk_json["choices"][0]
@@ -335,7 +335,7 @@ async def stream_openai_to_anthropic(openai_stream_generator):
                             if finish_reason:
                                 # This will be handled in [DONE]
                                 pass
-                                
+                
                 except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as e:
                     logger.warning(f"⚠️ Error parsing streaming chunk: {e}, chunk: {chunk[:200] if isinstance(chunk, bytes) else chunk}")
                     pass
