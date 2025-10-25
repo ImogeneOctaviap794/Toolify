@@ -11,7 +11,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 
-from tool_mapping import get_tool_call_mapping
+from .tool_mapping import get_tool_call_mapping
 
 logger = logging.getLogger(__name__)
 

@@ -25,31 +25,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 # Toolify modules
-from models import ChatCompletionRequest, AnthropicMessage, Tool, ToolFunction
-from token_counter import TokenCounter
+from toolify_core.models import ChatCompletionRequest, AnthropicMessage, Tool, ToolFunction
+from toolify_core.token_counter import TokenCounter
 from config_loader import config_loader, AppConfig
 from admin_auth import (
     LoginRequest, LoginResponse, verify_admin_token,
     verify_password, create_access_token, get_admin_credentials
 )
-from function_calling import (
+from toolify_core.function_calling import (
     generate_function_prompt,
     generate_random_trigger_signal,
     parse_function_calls_xml
 )
-from tool_mapping import store_tool_call_mapping
-from anthropic_adapter import (
+from toolify_core.tool_mapping import store_tool_call_mapping
+from toolify_core.anthropic_adapter import (
     anthropic_to_openai_request,
     openai_to_anthropic_response,
     stream_openai_to_anthropic
 )
-from message_processor import (
+from toolify_core.message_processor import (
     preprocess_messages,
     validate_message_structure,
     safe_process_tool_choice
 )
-from upstream_router import find_upstream
-from streaming_proxy import stream_proxy_with_fc_transform
+from toolify_core.upstream_router import find_upstream
+from toolify_core.streaming_proxy import stream_proxy_with_fc_transform
 
 logger = logging.getLogger(__name__)
 

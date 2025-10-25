@@ -99,30 +99,39 @@ graph LR
 ```
 toolify/
 ├── main.py                    # FastAPI 应用入口 & 路由定义
-├── models.py                  # Pydantic 数据模型
-├── token_counter.py           # Token 计数工具
-├── tool_mapping.py            # 工具调用映射管理器
-├── message_processor.py       # 消息预处理模块
-├── upstream_router.py         # 上游服务路由
-├── streaming_proxy.py         # 流式响应处理器
-├── anthropic_adapter.py       # Anthropic API 转换
 ├── config_loader.py           # 配置管理
 ├── admin_auth.py              # 管理员认证
-└── function_calling/          # 函数调用核心模块
+├── init_admin.py              # 管理员账号初始化
+├── config.yaml                # 配置文件
+├── frontend/                  # React 管理界面
+└── toolify_core/              # 核心模块包
     ├── __init__.py
-    ├── parser.py              # XML 解析逻辑
-    ├── prompt.py              # 提示词生成
-    └── streaming.py           # 流式检测
+    ├── models.py              # Pydantic 数据模型
+    ├── token_counter.py       # Token 计数工具
+    ├── tool_mapping.py        # 工具调用映射管理器
+    ├── message_processor.py   # 消息预处理模块
+    ├── upstream_router.py     # 上游服务路由
+    ├── streaming_proxy.py     # 流式响应处理器
+    ├── anthropic_adapter.py   # Anthropic API 转换
+    └── function_calling/      # 函数调用核心模块
+        ├── __init__.py
+        ├── parser.py          # XML 解析逻辑
+        ├── prompt.py          # 提示词生成
+        └── streaming.py       # 流式检测
 ```
 
 ### 核心模块说明
 
-- **`function_calling/`**: 函数调用核心逻辑（提示词生成、XML解析、流式检测）
-- **`models.py`**: 使用 Pydantic 的类型安全请求/响应模型
-- **`token_counter.py`**: 支持多种模型的精确 Token 计数
-- **`upstream_router.py`**: 智能路由，支持优先级故障转移
-- **`streaming_proxy.py`**: 处理流式响应并检测函数调用
-- **`anthropic_adapter.py`**: OpenAI 和 Anthropic API 格式无缝转换
+所有核心模块统一组织在 `toolify_core/` 包中：
+
+- **`toolify_core/function_calling/`**: 函数调用核心逻辑（提示词生成、XML解析、流式检测）
+- **`toolify_core/models.py`**: 使用 Pydantic 的类型安全请求/响应模型
+- **`toolify_core/token_counter.py`**: 支持多种模型的精确 Token 计数
+- **`toolify_core/upstream_router.py`**: 智能路由，支持优先级故障转移
+- **`toolify_core/streaming_proxy.py`**: 处理流式响应并检测函数调用
+- **`toolify_core/anthropic_adapter.py`**: OpenAI 和 Anthropic API 格式无缝转换
+- **`toolify_core/message_processor.py`**: 消息预处理和验证
+- **`toolify_core/tool_mapping.py`**: 带 TTL 和 LRU 缓存的工具调用映射
 
 ## 🚀 快速开始
 

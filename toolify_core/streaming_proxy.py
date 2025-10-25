@@ -14,8 +14,8 @@ import logging
 import httpx
 from typing import List, Dict, Any
 
-from function_calling import StreamingFunctionCallDetector, parse_function_calls_xml
-from tool_mapping import store_tool_call_mapping
+from .function_calling import StreamingFunctionCallDetector, parse_function_calls_xml
+from .tool_mapping import store_tool_call_mapping
 
 logger = logging.getLogger(__name__)
 

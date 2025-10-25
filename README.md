@@ -82,31 +82,40 @@ The codebase follows a modular architecture for better maintainability:
 
 ```
 toolify/
-├── main.py                    # FastAPI application & routes
-├── models.py                  # Pydantic data models
-├── token_counter.py           # Token counting utilities
-├── tool_mapping.py            # Tool call mapping manager
-├── message_processor.py       # Message preprocessing
-├── upstream_router.py         # Upstream service routing
-├── streaming_proxy.py         # Streaming response handler
-├── anthropic_adapter.py       # Anthropic API conversion
+├── main.py                    # FastAPI application entry & routes
 ├── config_loader.py           # Configuration management
 ├── admin_auth.py              # Admin authentication
-└── function_calling/          # Function calling module
+├── init_admin.py              # Admin account initialization
+├── config.yaml                # Configuration file
+├── frontend/                  # React admin interface
+└── toolify_core/              # Core modules package
     ├── __init__.py
-    ├── parser.py              # XML parsing logic
-    ├── prompt.py              # Prompt generation
-    └── streaming.py           # Streaming detection
+    ├── models.py              # Pydantic data models
+    ├── token_counter.py       # Token counting utilities
+    ├── tool_mapping.py        # Tool call mapping manager
+    ├── message_processor.py   # Message preprocessing
+    ├── upstream_router.py     # Upstream service routing
+    ├── streaming_proxy.py     # Streaming response handler
+    ├── anthropic_adapter.py   # Anthropic API conversion
+    └── function_calling/      # Function calling module
+        ├── __init__.py
+        ├── parser.py          # XML parsing logic
+        ├── prompt.py          # Prompt generation
+        └── streaming.py       # Streaming detection
 ```
 
 ### Key Modules
 
-- **`function_calling/`**: Core function calling logic (prompt generation, XML parsing, streaming detection)
-- **`models.py`**: Type-safe request/response models using Pydantic
-- **`token_counter.py`**: Accurate token counting for various models
-- **`upstream_router.py`**: Smart routing with priority-based failover
-- **`streaming_proxy.py`**: Handle streaming responses with function call detection
-- **`anthropic_adapter.py`**: Seamless format conversion between OpenAI and Anthropic APIs
+All core modules are organized in the `toolify_core/` package:
+
+- **`toolify_core/function_calling/`**: Core function calling logic (prompt generation, XML parsing, streaming detection)
+- **`toolify_core/models.py`**: Type-safe request/response models using Pydantic
+- **`toolify_core/token_counter.py`**: Accurate token counting for various models
+- **`toolify_core/upstream_router.py`**: Smart routing with priority-based failover
+- **`toolify_core/streaming_proxy.py`**: Handle streaming responses with function call detection
+- **`toolify_core/anthropic_adapter.py`**: Seamless format conversion between OpenAI and Anthropic APIs
+- **`toolify_core/message_processor.py`**: Message preprocessing and validation
+- **`toolify_core/tool_mapping.py`**: Tool call mapping with TTL and LRU cache
 
 ## Installation and Setup
 
