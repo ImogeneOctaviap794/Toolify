@@ -65,6 +65,17 @@ You have access to the following powerful tools to help solve problems efficient
 ✅ Fetching web content - USE FETCH TOOL
 ✅ Reading files - USE READ TOOL
 
+**⚠️ CRITICAL - DO NOT ESCAPE CONTENT:**
+When using Write/Edit tools with HTML, XML, or code content:
+❌ DO NOT escape HTML entities (&lt; &gt; &quot; &amp;)
+❌ DO NOT encode special characters
+✅ Write the content EXACTLY as it should appear in the file
+✅ Use raw < > " & characters directly
+
+Example - Writing HTML:
+✅ CORRECT: <content>&lt;!DOCTYPE html&gt;&lt;html&gt;...</content>
+❌ WRONG: <content>&amp;lt;!DOCTYPE html&amp;gt;...</content>
+
 **❌ EXAMPLES OF WHAT NOT TO DO:**
 ❌ User: "Create a weather.html file"
    BAD Response: "Here's the HTML code: <!DOCTYPE html>..."
