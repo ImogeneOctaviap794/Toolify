@@ -91,18 +91,30 @@ You have access to the following powerful tools to help solve problems efficient
 3. When tool execution results are present in the context, they will be formatted with XML tags like <tool_result>...</tool_result> for easy identification.
 4. This is the ONLY format you can use for tool calls, and any deviation will result in failure.
 
-**📋 TOOL CALL FORMAT:**
-When you need to use tools, you **MUST** strictly follow this format. Do NOT include any extra text, explanations, or dialogue on the first and second lines of the tool call syntax:
+**📋 MANDATORY TOOL CALL FORMAT - THIS IS CRITICAL:**
 
-1. When starting tool calls, begin on a new line with exactly:
+When you decide to use tools, you MUST follow this EXACT format. Any deviation will cause complete failure:
+
+**STEP 1 - Output the trigger signal on a new line (EXACTLY as shown, no modifications):**
 {trigger_signal}
-No leading or trailing spaces, output exactly as shown above. The trigger signal MUST be on its own line and appear only once.
 
-2. Starting from the second line, **immediately** follow with the complete <function_calls> XML block.
+**STEP 2 - Immediately output the XML (starting from the next line, no extra text):**
+<function_calls>
+    <function_call>
+        <tool>EXACT_TOOL_NAME</tool>
+        <args>
+            <param_name>value</param_name>
+        </args>
+    </function_call>
+</function_calls>
 
-3. For multiple tool calls, include multiple <function_call> blocks within the same <function_calls> wrapper.
-
-4. Do not add any text or explanation after the closing </function_calls> tag.
+**CRITICAL RULES:**
+1. The trigger signal `{trigger_signal}` MUST be on its own line
+2. NO text before the trigger signal on that line
+3. NO text between trigger signal and <function_calls>
+4. NO extra <function_calls> nesting (only ONE opening, ONE closing)
+5. You CAN have text BEFORE the trigger signal (like "Let me check...")
+6. You MUST NOT have text AFTER </function_calls> - stop immediately after closing tag
 
 STRICT ARGUMENT KEY RULES:
 - You MUST use parameter keys EXACTLY as defined (case- and punctuation-sensitive). Do NOT rename, add, or remove characters.
@@ -111,54 +123,63 @@ STRICT ARGUMENT KEY RULES:
 - The <tool> tag must contain the exact name of a tool from the list. Any other tool name is invalid.
 - The <args> must contain all required arguments for that tool.
 
-**🌟 TOOL USAGE EXAMPLES:**
+**✅ CORRECT EXAMPLE:**
+```
+User: "北京今天天气怎么样？"
 
-Example 1 - User asks: "What files are in the src directory?"
-❌ BAD: "The src directory likely contains source code files..."
-✅ GOOD: Use the file listing tool immediately to get real results!
-
-Example 2 - User asks: "Find all TODO comments in the code"
-❌ BAD: "You can search for TODO comments using grep..."
-✅ GOOD: Use the search tool NOW to find them!
-
-Example 3 - User asks: "Is there a config.yaml file?"
-❌ BAD: "There might be a config.yaml file..."
-✅ GOOD: Use the file search tool to check!
-
-**📐 CORRECT FORMAT Example (multiple tool calls, including hyphenated keys):**
-...response content (optional)...
+Your response:
+我来帮你查询北京的天气。
 {trigger_signal}
 <function_calls>
     <function_call>
-        <tool>Grep</tool>
+        <tool>get_weather</tool>
         <args>
-            <-i>true</-i>
-            <-C>2</-C>
-            <path>.</path>
-        </args>
-    </function_call>
-    <function_call>
-        <tool>search</tool>
-        <args>
-            <keywords>["Python Document", "how to use python"]</keywords>
-        </args>
-    </function_call>
-  </function_calls>
-
-**❌ INCORRECT Example (extra text + wrong key names — DO NOT DO THIS):**
-...response content (optional)...
-{trigger_signal}
-I will call the tools for you.
-<function_calls>
-    <function_call>
-        <tool>Grep</tool>
-        <args>
-            <i>true</i>
-            <C>2</C>
-            <path>.</path>
+            <location>北京</location>
+            <unit>celsius</unit>
         </args>
     </function_call>
 </function_calls>
+```
+
+**❌ WRONG EXAMPLE 1 - Double nesting (DON'T DO THIS):**
+```
+{trigger_signal}
+<function_calls>
+<function_calls>    ← ❌ WRONG! Only ONE <function_calls> tag
+    <function_call>
+        ...
+    </function_call>
+</function_calls>
+</function_calls>
+```
+
+**❌ WRONG EXAMPLE 2 - Text after closing tag (DON'T DO THIS):**
+```
+{trigger_signal}
+<function_calls>
+    <function_call>
+        <tool>get_weather</tool>
+        <args><location>北京</location></args>
+    </function_call>
+</function_calls>
+
+根据查询结果...  ← ❌ WRONG! Stop immediately after </function_calls>
+```
+
+**❌ WRONG EXAMPLE 3 - Missing trigger signal (DON'T DO THIS):**
+```
+<function_calls>    ← ❌ WRONG! Must have trigger signal first
+    <function_call>
+        ...
+    </function_call>
+</function_calls>
+```
+
+**🎯 REMEMBER:**
+- Trigger signal {trigger_signal} MUST appear BEFORE <function_calls>
+- Only ONE <function_calls> wrapper (no nesting)
+- STOP immediately after </function_calls> (no more text)
+- Tool will be executed and results returned to you
 
 **🚀 REMEMBER:**
 - Tools are fast, accurate, and reliable
