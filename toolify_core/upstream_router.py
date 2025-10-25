@@ -45,7 +45,17 @@ def find_upstream(
             service_list = sorted(service_list, key=lambda x: x.get('priority', 0), reverse=True)
             priority_list = [f"{s['name']}({s.get('priority', 0)})" for s in service_list]
             logger.info(f"📋 Found {len(service_list)} valid services, priority order: {priority_list}")
-            return service_list, model_name
+            
+            # Apply model_mapping redirect in passthrough mode
+            actual_model_name = model_name
+            if service_list[0].get('model_mapping'):
+                model_mapping = service_list[0]['model_mapping']
+                if model_name in model_mapping:
+                    redirected_model = model_mapping[model_name]
+                    logger.info(f"🔄 Model redirect (passthrough): {model_name} → {redirected_model}")
+                    actual_model_name = redirected_model
+            
+            return service_list, actual_model_name
         else:
             raise HTTPException(status_code=500, detail="配置错误：model_passthrough 模式下没有找到有效的上游服务")
 
