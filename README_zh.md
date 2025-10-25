@@ -99,7 +99,8 @@ graph LR
 ```mermaid
 graph TB
     subgraph "客户端层"
-        Client[客户端应用<br/>OpenAI SDK / Anthropic SDK]
+        Client1[OpenAI SDK 客户端<br/>chat/completions]
+        Client2[Anthropic SDK 客户端<br/>messages API]
     end
 
     subgraph "Toolify 中间件"
@@ -111,6 +112,10 @@ graph TB
 
         subgraph "核心处理层 - toolify_core/"
             Models[models.py<br/>数据模型]
+            
+            subgraph "格式转换"
+                Anthropic[anthropic_adapter.py<br/>Anthropic ↔ OpenAI<br/>格式转换器]
+            end
             
             subgraph "请求处理"
                 MsgProc[message_processor.py<br/>消息预处理]
@@ -125,7 +130,6 @@ graph TB
             
             subgraph "流式处理 & 代理"
                 StreamProxy[streaming_proxy.py<br/>流式处理器]
-                Anthropic[anthropic_adapter.py<br/>格式转换]
             end
             
             subgraph "工具模块"
@@ -145,29 +149,34 @@ graph TB
         Frontend[React 管理界面<br/>可视化配置]
     end
 
-    Client -->|1. 请求 + 工具| Main
+    Client1 -->|OpenAI 格式| Main
+    Client2 -->|Anthropic 格式| Main
+    Main -->|转换为 OpenAI| Anthropic
+    Anthropic --> Models
     Main --> Auth
     Main --> Models
-    Main --> MsgProc
+    Models --> MsgProc
     MsgProc --> FC_Prompt
     FC_Prompt --> Router
-    Router -->|2. 注入提示词| Upstream1
+    Router -->|注入提示词| Upstream1
     Router -.->|故障转移| Upstream2
     Router -.->|故障转移| Upstream3
-    Upstream1 -->|3. XML 响应| StreamProxy
+    Upstream1 -->|XML 响应| StreamProxy
     StreamProxy --> FC_Parser
     StreamProxy --> FC_Stream
-    FC_Parser -->|4. 解析 & 转换| Main
-    Main -->|5. 标准格式| Client
-    
-    Main --> Anthropic
-    Main --> TokenCounter
     FC_Parser --> ToolMap
+    FC_Parser -->|解析 & 转换| Main
+    Main -->|转换回 Anthropic| Anthropic
+    Anthropic -->|Anthropic 格式| Client2
+    Main -->|OpenAI 格式| Client1
+    
+    Main --> TokenCounter
     
     Frontend -->|管理 API| Auth
     Frontend --> Config
 
     style Main fill:#e1f5ff
+    style Anthropic fill:#ffebcd
     style FC_Prompt fill:#ffe1f5
     style FC_Parser fill:#ffe1f5
     style Router fill:#f5ffe1
@@ -180,32 +189,52 @@ graph TB
 sequenceDiagram
     participant C as 客户端
     participant M as Main (FastAPI)
+    participant A as Anthropic 适配器
     participant MP as 消息处理器
     participant FC as 函数调用引擎
     participant R as 路由器
     participant U as 上游 LLM
     participant SP as 流式代理
 
-    C->>M: POST /v1/chat/completions
-    M->>MP: 预处理消息
+    alt OpenAI 格式请求
+        C->>M: POST /v1/chat/completions
+        M->>MP: 预处理消息
+    else Anthropic 格式请求
+        C->>M: POST /v1/messages
+        M->>A: 转换 Anthropic → OpenAI
+        A->>MP: 转换后的请求
+    end
+    
     MP->>FC: 生成函数提示词
     FC-->>M: 注入系统提示
     M->>R: 查找上游服务
     R-->>M: 优先级排序的服务列表
     
     alt 非流式请求
-        M->>U: 转发请求
+        M->>U: 转发请求（OpenAI 格式）
         U-->>M: 完整响应
         M->>FC: 检测并解析 XML
         FC-->>M: 转换后的 tool_calls
-        M-->>C: 标准 OpenAI 格式
+        
+        alt OpenAI 客户端
+            M-->>C: 标准 OpenAI 格式
+        else Anthropic 客户端
+            M->>A: 转换 OpenAI → Anthropic
+            A-->>C: Anthropic 格式响应
+        end
     else 流式请求
         M->>SP: 启动流式传输
         SP->>U: 流式请求
         U-->>SP: 流式数据块
         SP->>FC: 实时检测 & 解析
         FC-->>SP: 工具调用数据块
-        SP-->>C: 流式响应
+        
+        alt OpenAI 客户端
+            SP-->>C: OpenAI 流式响应
+        else Anthropic 客户端
+            SP->>A: 转换流式格式
+            A-->>C: Anthropic 流式响应
+        end
     end
 ```
 

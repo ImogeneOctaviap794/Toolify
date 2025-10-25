@@ -83,7 +83,8 @@
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        Client[Client Application<br/>OpenAI SDK / Anthropic SDK]
+        Client1[OpenAI SDK Client<br/>chat/completions]
+        Client2[Anthropic SDK Client<br/>messages API]
     end
 
     subgraph "Toolify Middleware"
@@ -95,6 +96,10 @@ graph TB
 
         subgraph "Core Processing - toolify_core/"
             Models[models.py<br/>Data Models]
+            
+            subgraph "Format Conversion"
+                Anthropic[anthropic_adapter.py<br/>Anthropic ↔ OpenAI<br/>Format Converter]
+            end
             
             subgraph "Request Processing"
                 MsgProc[message_processor.py<br/>Message Preprocessing]
@@ -109,7 +114,6 @@ graph TB
             
             subgraph "Streaming & Proxy"
                 StreamProxy[streaming_proxy.py<br/>Streaming Handler]
-                Anthropic[anthropic_adapter.py<br/>Format Conversion]
             end
             
             subgraph "Utilities"
@@ -129,29 +133,34 @@ graph TB
         Frontend[React Admin UI<br/>Configuration Management]
     end
 
-    Client -->|1. Request + Tools| Main
+    Client1 -->|OpenAI Format| Main
+    Client2 -->|Anthropic Format| Main
+    Main -->|Convert to OpenAI| Anthropic
+    Anthropic --> Models
     Main --> Auth
     Main --> Models
-    Main --> MsgProc
+    Models --> MsgProc
     MsgProc --> FC_Prompt
     FC_Prompt --> Router
-    Router -->|2. Inject Prompt| Upstream1
+    Router -->|Inject Prompt| Upstream1
     Router -.->|Failover| Upstream2
     Router -.->|Failover| Upstream3
-    Upstream1 -->|3. XML Response| StreamProxy
+    Upstream1 -->|XML Response| StreamProxy
     StreamProxy --> FC_Parser
     StreamProxy --> FC_Stream
-    FC_Parser -->|4. Parse & Convert| Main
-    Main -->|5. Standard Format| Client
-    
-    Main --> Anthropic
-    Main --> TokenCounter
     FC_Parser --> ToolMap
+    FC_Parser -->|Parse & Convert| Main
+    Main -->|Convert back| Anthropic
+    Anthropic -->|Anthropic Format| Client2
+    Main -->|OpenAI Format| Client1
+    
+    Main --> TokenCounter
     
     Frontend -->|Admin API| Auth
     Frontend --> Config
 
     style Main fill:#e1f5ff
+    style Anthropic fill:#ffebcd
     style FC_Prompt fill:#ffe1f5
     style FC_Parser fill:#ffe1f5
     style Router fill:#f5ffe1
@@ -164,32 +173,52 @@ graph TB
 sequenceDiagram
     participant C as Client
     participant M as Main (FastAPI)
+    participant A as Anthropic Adapter
     participant MP as Message Processor
     participant FC as Function Calling
     participant R as Router
     participant U as Upstream LLM
     participant SP as Stream Proxy
 
-    C->>M: POST /v1/chat/completions
-    M->>MP: Preprocess messages
+    alt OpenAI Format Request
+        C->>M: POST /v1/chat/completions
+        M->>MP: Preprocess messages
+    else Anthropic Format Request
+        C->>M: POST /v1/messages
+        M->>A: Convert Anthropic → OpenAI
+        A->>MP: Converted request
+    end
+    
     MP->>FC: Generate function prompt
     FC-->>M: Injected system prompt
     M->>R: Find upstream service
     R-->>M: Priority-sorted upstreams
     
     alt Non-Streaming
-        M->>U: Forward request
+        M->>U: Forward request (OpenAI format)
         U-->>M: Complete response
         M->>FC: Parse XML if detected
         FC-->>M: Converted tool_calls
-        M-->>C: Standard OpenAI format
+        
+        alt OpenAI Client
+            M-->>C: Standard OpenAI format
+        else Anthropic Client
+            M->>A: Convert OpenAI → Anthropic
+            A-->>C: Anthropic format response
+        end
     else Streaming
         M->>SP: Start streaming
         SP->>U: Stream request
         U-->>SP: Streaming chunks
         SP->>FC: Detect & parse on-the-fly
         FC-->>SP: Tool calls chunks
-        SP-->>C: Stream response
+        
+        alt OpenAI Client
+            SP-->>C: OpenAI stream
+        else Anthropic Client
+            SP->>A: Convert stream format
+            A-->>C: Anthropic stream
+        end
     end
 ```
 
