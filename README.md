@@ -78,44 +78,133 @@
 
 ## 🏗️ Architecture
 
-The codebase follows a modular architecture for better maintainability:
+### System Architecture Diagram
 
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Client[Client Application<br/>OpenAI SDK / Anthropic SDK]
+    end
+
+    subgraph "Toolify Middleware"
+        subgraph "API Gateway"
+            Main[main.py<br/>FastAPI Routes]
+            Auth[admin_auth.py<br/>Authentication]
+            Config[config_loader.py<br/>Configuration]
+        end
+
+        subgraph "Core Processing - toolify_core/"
+            Models[models.py<br/>Data Models]
+            
+            subgraph "Request Processing"
+                MsgProc[message_processor.py<br/>Message Preprocessing]
+                Router[upstream_router.py<br/>Smart Routing]
+            end
+            
+            subgraph "Function Calling Engine"
+                FC_Prompt[function_calling/prompt.py<br/>Prompt Generation]
+                FC_Parser[function_calling/parser.py<br/>XML Parsing]
+                FC_Stream[function_calling/streaming.py<br/>Stream Detection]
+            end
+            
+            subgraph "Streaming & Proxy"
+                StreamProxy[streaming_proxy.py<br/>Streaming Handler]
+                Anthropic[anthropic_adapter.py<br/>Format Conversion]
+            end
+            
+            subgraph "Utilities"
+                TokenCounter[token_counter.py<br/>Token Counting]
+                ToolMap[tool_mapping.py<br/>Tool Call Mapping]
+            end
+        end
+    end
+
+    subgraph "Upstream Services"
+        Upstream1[OpenAI API<br/>Priority: 100]
+        Upstream2[Backup Service<br/>Priority: 50]
+        Upstream3[Fallback Service<br/>Priority: 10]
+    end
+
+    subgraph "Admin Interface"
+        Frontend[React Admin UI<br/>Configuration Management]
+    end
+
+    Client -->|1. Request + Tools| Main
+    Main --> Auth
+    Main --> Models
+    Main --> MsgProc
+    MsgProc --> FC_Prompt
+    FC_Prompt --> Router
+    Router -->|2. Inject Prompt| Upstream1
+    Router -.->|Failover| Upstream2
+    Router -.->|Failover| Upstream3
+    Upstream1 -->|3. XML Response| StreamProxy
+    StreamProxy --> FC_Parser
+    StreamProxy --> FC_Stream
+    FC_Parser -->|4. Parse & Convert| Main
+    Main -->|5. Standard Format| Client
+    
+    Main --> Anthropic
+    Main --> TokenCounter
+    FC_Parser --> ToolMap
+    
+    Frontend -->|Admin API| Auth
+    Frontend --> Config
+
+    style Main fill:#e1f5ff
+    style FC_Prompt fill:#ffe1f5
+    style FC_Parser fill:#ffe1f5
+    style Router fill:#f5ffe1
+    style StreamProxy fill:#fff4e1
 ```
-toolify/
-├── main.py                    # FastAPI application entry & routes
-├── config_loader.py           # Configuration management
-├── admin_auth.py              # Admin authentication
-├── init_admin.py              # Admin account initialization
-├── config.yaml                # Configuration file
-├── frontend/                  # React admin interface
-└── toolify_core/              # Core modules package
-    ├── __init__.py
-    ├── models.py              # Pydantic data models
-    ├── token_counter.py       # Token counting utilities
-    ├── tool_mapping.py        # Tool call mapping manager
-    ├── message_processor.py   # Message preprocessing
-    ├── upstream_router.py     # Upstream service routing
-    ├── streaming_proxy.py     # Streaming response handler
-    ├── anthropic_adapter.py   # Anthropic API conversion
-    └── function_calling/      # Function calling module
-        ├── __init__.py
-        ├── parser.py          # XML parsing logic
-        ├── prompt.py          # Prompt generation
-        └── streaming.py       # Streaming detection
+
+### Request Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as Main (FastAPI)
+    participant MP as Message Processor
+    participant FC as Function Calling
+    participant R as Router
+    participant U as Upstream LLM
+    participant SP as Stream Proxy
+
+    C->>M: POST /v1/chat/completions
+    M->>MP: Preprocess messages
+    MP->>FC: Generate function prompt
+    FC-->>M: Injected system prompt
+    M->>R: Find upstream service
+    R-->>M: Priority-sorted upstreams
+    
+    alt Non-Streaming
+        M->>U: Forward request
+        U-->>M: Complete response
+        M->>FC: Parse XML if detected
+        FC-->>M: Converted tool_calls
+        M-->>C: Standard OpenAI format
+    else Streaming
+        M->>SP: Start streaming
+        SP->>U: Stream request
+        U-->>SP: Streaming chunks
+        SP->>FC: Detect & parse on-the-fly
+        FC-->>SP: Tool calls chunks
+        SP-->>C: Stream response
+    end
 ```
 
-### Key Modules
+### Core Module Overview
 
-All core modules are organized in the `toolify_core/` package:
-
-- **`toolify_core/function_calling/`**: Core function calling logic (prompt generation, XML parsing, streaming detection)
-- **`toolify_core/models.py`**: Type-safe request/response models using Pydantic
-- **`toolify_core/token_counter.py`**: Accurate token counting for various models
-- **`toolify_core/upstream_router.py`**: Smart routing with priority-based failover
-- **`toolify_core/streaming_proxy.py`**: Handle streaming responses with function call detection
-- **`toolify_core/anthropic_adapter.py`**: Seamless format conversion between OpenAI and Anthropic APIs
-- **`toolify_core/message_processor.py`**: Message preprocessing and validation
-- **`toolify_core/tool_mapping.py`**: Tool call mapping with TTL and LRU cache
+| Module | Responsibility | Key Features |
+|--------|---------------|--------------|
+| **function_calling/** | Function call engine | Prompt injection, XML parsing, streaming detection |
+| **models.py** | Data validation | Pydantic models for type safety |
+| **token_counter.py** | Token management | Accurate counting for 20+ models |
+| **upstream_router.py** | Service routing | Priority-based failover, smart retry |
+| **streaming_proxy.py** | Stream handling | Real-time parsing, chunk management |
+| **anthropic_adapter.py** | Format conversion | Seamless OpenAI ↔ Anthropic translation |
+| **message_processor.py** | Message prep | Tool result formatting, validation |
+| **tool_mapping.py** | Call tracking | TTL cache, LRU eviction |
 
 ## Installation and Setup
 

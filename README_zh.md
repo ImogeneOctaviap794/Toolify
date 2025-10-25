@@ -94,44 +94,133 @@ graph LR
 
 ## 🏗️ 架构设计
 
-代码采用模块化架构设计，提升可维护性：
+### 系统架构图
 
+```mermaid
+graph TB
+    subgraph "客户端层"
+        Client[客户端应用<br/>OpenAI SDK / Anthropic SDK]
+    end
+
+    subgraph "Toolify 中间件"
+        subgraph "API 网关"
+            Main[main.py<br/>FastAPI 路由]
+            Auth[admin_auth.py<br/>身份认证]
+            Config[config_loader.py<br/>配置管理]
+        end
+
+        subgraph "核心处理层 - toolify_core/"
+            Models[models.py<br/>数据模型]
+            
+            subgraph "请求处理"
+                MsgProc[message_processor.py<br/>消息预处理]
+                Router[upstream_router.py<br/>智能路由]
+            end
+            
+            subgraph "函数调用引擎"
+                FC_Prompt[function_calling/prompt.py<br/>提示词生成]
+                FC_Parser[function_calling/parser.py<br/>XML 解析]
+                FC_Stream[function_calling/streaming.py<br/>流式检测]
+            end
+            
+            subgraph "流式处理 & 代理"
+                StreamProxy[streaming_proxy.py<br/>流式处理器]
+                Anthropic[anthropic_adapter.py<br/>格式转换]
+            end
+            
+            subgraph "工具模块"
+                TokenCounter[token_counter.py<br/>Token 计数]
+                ToolMap[tool_mapping.py<br/>工具调用映射]
+            end
+        end
+    end
+
+    subgraph "上游服务"
+        Upstream1[OpenAI API<br/>优先级: 100]
+        Upstream2[备用服务<br/>优先级: 50]
+        Upstream3[兜底服务<br/>优先级: 10]
+    end
+
+    subgraph "管理界面"
+        Frontend[React 管理界面<br/>可视化配置]
+    end
+
+    Client -->|1. 请求 + 工具| Main
+    Main --> Auth
+    Main --> Models
+    Main --> MsgProc
+    MsgProc --> FC_Prompt
+    FC_Prompt --> Router
+    Router -->|2. 注入提示词| Upstream1
+    Router -.->|故障转移| Upstream2
+    Router -.->|故障转移| Upstream3
+    Upstream1 -->|3. XML 响应| StreamProxy
+    StreamProxy --> FC_Parser
+    StreamProxy --> FC_Stream
+    FC_Parser -->|4. 解析 & 转换| Main
+    Main -->|5. 标准格式| Client
+    
+    Main --> Anthropic
+    Main --> TokenCounter
+    FC_Parser --> ToolMap
+    
+    Frontend -->|管理 API| Auth
+    Frontend --> Config
+
+    style Main fill:#e1f5ff
+    style FC_Prompt fill:#ffe1f5
+    style FC_Parser fill:#ffe1f5
+    style Router fill:#f5ffe1
+    style StreamProxy fill:#fff4e1
 ```
-toolify/
-├── main.py                    # FastAPI 应用入口 & 路由定义
-├── config_loader.py           # 配置管理
-├── admin_auth.py              # 管理员认证
-├── init_admin.py              # 管理员账号初始化
-├── config.yaml                # 配置文件
-├── frontend/                  # React 管理界面
-└── toolify_core/              # 核心模块包
-    ├── __init__.py
-    ├── models.py              # Pydantic 数据模型
-    ├── token_counter.py       # Token 计数工具
-    ├── tool_mapping.py        # 工具调用映射管理器
-    ├── message_processor.py   # 消息预处理模块
-    ├── upstream_router.py     # 上游服务路由
-    ├── streaming_proxy.py     # 流式响应处理器
-    ├── anthropic_adapter.py   # Anthropic API 转换
-    └── function_calling/      # 函数调用核心模块
-        ├── __init__.py
-        ├── parser.py          # XML 解析逻辑
-        ├── prompt.py          # 提示词生成
-        └── streaming.py       # 流式检测
+
+### 请求处理流程
+
+```mermaid
+sequenceDiagram
+    participant C as 客户端
+    participant M as Main (FastAPI)
+    participant MP as 消息处理器
+    participant FC as 函数调用引擎
+    participant R as 路由器
+    participant U as 上游 LLM
+    participant SP as 流式代理
+
+    C->>M: POST /v1/chat/completions
+    M->>MP: 预处理消息
+    MP->>FC: 生成函数提示词
+    FC-->>M: 注入系统提示
+    M->>R: 查找上游服务
+    R-->>M: 优先级排序的服务列表
+    
+    alt 非流式请求
+        M->>U: 转发请求
+        U-->>M: 完整响应
+        M->>FC: 检测并解析 XML
+        FC-->>M: 转换后的 tool_calls
+        M-->>C: 标准 OpenAI 格式
+    else 流式请求
+        M->>SP: 启动流式传输
+        SP->>U: 流式请求
+        U-->>SP: 流式数据块
+        SP->>FC: 实时检测 & 解析
+        FC-->>SP: 工具调用数据块
+        SP-->>C: 流式响应
+    end
 ```
 
-### 核心模块说明
+### 核心模块概览
 
-所有核心模块统一组织在 `toolify_core/` 包中：
-
-- **`toolify_core/function_calling/`**: 函数调用核心逻辑（提示词生成、XML解析、流式检测）
-- **`toolify_core/models.py`**: 使用 Pydantic 的类型安全请求/响应模型
-- **`toolify_core/token_counter.py`**: 支持多种模型的精确 Token 计数
-- **`toolify_core/upstream_router.py`**: 智能路由，支持优先级故障转移
-- **`toolify_core/streaming_proxy.py`**: 处理流式响应并检测函数调用
-- **`toolify_core/anthropic_adapter.py`**: OpenAI 和 Anthropic API 格式无缝转换
-- **`toolify_core/message_processor.py`**: 消息预处理和验证
-- **`toolify_core/tool_mapping.py`**: 带 TTL 和 LRU 缓存的工具调用映射
+| 模块 | 职责 | 核心特性 |
+|------|------|---------|
+| **function_calling/** | 函数调用引擎 | 提示词注入、XML解析、流式检测 |
+| **models.py** | 数据验证 | Pydantic 类型安全模型 |
+| **token_counter.py** | Token 管理 | 支持 20+ 模型的精确计数 |
+| **upstream_router.py** | 服务路由 | 优先级故障转移、智能重试 |
+| **streaming_proxy.py** | 流式处理 | 实时解析、数据块管理 |
+| **anthropic_adapter.py** | 格式转换 | OpenAI ↔ Anthropic 无缝转换 |
+| **message_processor.py** | 消息预处理 | 工具结果格式化、验证 |
+| **tool_mapping.py** | 调用跟踪 | TTL 缓存、LRU 淘汰策略 |
 
 ## 🚀 快速开始
 
