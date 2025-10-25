@@ -1,176 +1,381 @@
-# Toolify Admin
+<div align="center">
+
+# 🚀 Toolify Admin
+
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178c6.svg)](https://www.typescriptlang.org/)
+
+**为任何 LLM 注入函数调用能力 + 可视化配置管理界面**
 
 [English](README.md) | [简体中文](README_zh.md)
 
-> **项目来源**: 本项目基于 [funnycups/toolify](https://github.com/funnycups/toolify) 开发  
-> **主要改进**: 新增 Web 管理界面，支持可视化配置管理和实时配置重载  
-> **致谢**: 感谢原作者 FunnyCups 开发的优秀 Toolify 中间件项目
+[快速开始](#-快速开始) • [功能特性](#-核心特性) • [使用文档](#-使用方法) • [管理界面](#-web-管理界面) • [贡献指南](#-贡献)
 
 ---
 
-**为任何大型语言模型赋予函数调用能力，并提供可视化配置管理界面。**
+### 📊 项目来源与致谢
 
-Toolify Admin 是一个 LLM 函数调用中间件代理，在原 Toolify 项目基础上增强了管理功能。它为不支持函数调用的大型语言模型注入 OpenAI 兼容的函数调用能力，同时提供现代化的 Web 管理界面，让您无需手动编辑 YAML 文件即可轻松管理所有配置。
+> 本项目基于 [funnycups/toolify](https://github.com/funnycups/toolify) 开发  
+> 感谢原作者 **FunnyCups** 创建的优秀 Toolify 中间件项目
 
-## 核心特性
+### ✨ 主要增强
 
-- **通用函数调用**：为遵循 OpenAI API 格式但缺乏原生支持的 LLM 或接口启用函数调用。
-- **多函数调用支持**：支持在单次响应中同时执行多个函数。
-- **灵活的调用时机**：允许在模型输出的任意阶段启动函数调用。
-- **兼容 `<think>` 标签**：无缝处理 `<think>` 标签，确保它们不会干扰工具解析。
-- **流式响应支持**：全面支持流式响应，实时检测和解析函数调用。
-- **多服务路由**：根据请求的模型名称，将请求路由到不同的上游服务。
-- **多渠道优先级与故障转移**：支持为同一模型配置多个渠道，按优先级自动故障转移，提升服务可用性。
-- **客户端认证**：通过可配置的客户端 API 密钥保护中间件安全。
-- **增强的上下文感知**：在返回工具执行结果时，同时向 LLM 提供先前调用的工具详情（名称和参数），提升模型的上下文理解能力。
-- **Web 管理界面**：提供现代化的 Web 界面，可视化管理所有配置选项，实时生效无需重启。
+- 🎨 **Web 管理界面** - React 19 + TypeScript 可视化配置
+- ⚡ **实时配置重载** - 无需重启即可生效
+- 🔄 **多渠道故障转移** - 智能优先级路由
+- 🌐 **多 API 格式支持** - OpenAI + Anthropic Claude 格式
+- 📱 **响应式设计** - 完美适配移动端和桌面端
 
-## 工作原理
+</div>
 
-1. **拦截请求**：Toolify 拦截来自客户端的 `chat/completions` 请求，该请求包含所需的工具定义。
-2. **注入提示词**：生成一个特定的系统提示词，指导 LLM 使用结构化的 XML 格式和唯一的触发信号来输出函数调用。
-3. **代理到上游**：将修改后的请求发送到配置的上游 LLM 服务。
-4. **解析响应**：Toolify 分析上游响应。如果检测到触发信号，它会解析 XML 结构以提取函数调用。
-5. **格式化响应**：将解析出的工具调用转换为标准的 OpenAI `tool_calls` 格式，并将其发送回客户端。
+---
 
-## 安装与设置
+## 📖 简介
 
-您可以通过 Docker Compose 或使用 Python 直接运行 Toolify。
+**Toolify Admin** 是一个强大的 LLM 函数调用中间件代理，专为企业级应用设计。它通过 **Prompt Injection** 技术为不支持原生函数调用的大型语言模型注入 OpenAI 兼容的函数调用能力，同时提供现代化的 Web 管理界面实现配置的可视化管理。
 
-### 选项 1: 使用 Docker Compose
+## ✨ 核心特性
 
-这是推荐的简易部署方式。
+<table>
+<tr>
+<td width="50%">
 
-#### 前提条件
+### 🎯 函数调用能力
 
-- 已安装 Docker 和 Docker Compose。
+- 🔌 **通用函数调用** - 为任何 LLM 注入 OpenAI 兼容的函数调用
+- 📦 **多函数并发** - 单次响应支持多个函数同时执行
+- ⚡ **灵活触发** - 模型输出任意阶段都可启动函数调用
+- 🧠 **Think 标签兼容** - 无缝处理思考过程，不干扰解析
+- 🌊 **流式支持** - 完整支持流式响应，实时解析工具调用
+- 🎨 **上下文增强** - 提供工具调用详情，提升模型理解
 
-#### 步骤
+</td>
+<td width="50%">
 
-1. **克隆仓库：**
+### 🛡️ 企业级功能
 
-   ```bash
-   git clone https://github.com/ImogeneOctaviap794/Toolify.git
-   cd Toolify
-   ```
+- 🔄 **多渠道故障转移** - 智能优先级路由，自动切换备用通道
+- 🌐 **多 API 格式** - 支持 OpenAI + Anthropic Claude 双格式
+- 🔐 **安全认证** - JWT Token + bcrypt 加密管理员系统
+- ⚡ **实时重载** - 配置修改立即生效，零停机更新
+- 📊 **可视化管理** - 现代 Web 界面，一键配置所有选项
+- 📱 **响应式设计** - 完美适配桌面、平板、手机
 
-2. **配置应用程序：**
+</td>
+</tr>
+</table>
 
-   复制示例配置文件并进行编辑：
+## 🔄 工作原理
 
-   ```bash
-   cp config.example.yaml config.yaml
-   ```
+```mermaid
+graph LR
+    A[客户端] -->|1. 请求 + Tools| B[Toolify Admin]
+    B -->|2. 注入 Prompt| C[上游 LLM]
+    C -->|3. XML 格式响应| B
+    B -->|4. 解析 + 转换| A
+    
+    style A fill:#e1f5ff
+    style B fill:#ffe1f5
+    style C fill:#f5ffe1
+```
 
-   编辑 `config.yaml`。特别注意添加 `admin_authentication` 配置（用于 Web 管理界面）：
+### 处理流程
 
-   ```yaml
-   admin_authentication:
-     username: "admin"
-     password: "$2b$12$..."  # 使用 init_admin.py 生成
-     jwt_secret: "your-secure-random-jwt-secret-min-32-chars"
-   ```
+| 步骤 | 说明 | 技术细节 |
+|------|------|----------|
+| 1️⃣ **拦截请求** | 接收客户端的函数调用请求 | 支持 OpenAI/Anthropic 双格式 |
+| 2️⃣ **注入提示词** | 生成专属 Prompt 指导模型输出 | 动态触发信号 + XML 模板 |
+| 3️⃣ **代理转发** | 转发到配置的上游服务 | 多渠道优先级路由 |
+| 4️⃣ **智能解析** | 检测并解析 XML 格式的工具调用 | 支持嵌套、Think 块、流式 |
+| 5️⃣ **格式转换** | 转换为标准 OpenAI/Anthropic 格式 | 完整兼容官方 SDK |
 
-   或使用 `init_admin.py` 脚本自动生成：
+## 🚀 快速开始
 
-   ```bash
-   python init_admin.py
-   ```
+### 方式一：Docker 部署（推荐⭐）
 
-3. **启动服务：**
+<details open>
+<summary><b>🐳 使用 Docker Compose 一键部署</b></summary>
 
-   ```bash
-   docker-compose up -d --build
-   ```
+#### 📋 前置要求
 
-   这将构建 Docker 镜像（包含前端管理界面）并以后台模式启动 Toolify 服务。
+- ✅ Docker 20.10+
+- ✅ Docker Compose 2.0+
 
-   - API 服务：`http://localhost:8000`
-   - 管理界面：`http://localhost:8000/admin`
+#### 🔧 部署步骤
 
-   **注意**：Docker 构建时会自动编译前端，首次构建可能需要几分钟时间。
+```bash
+# 1️⃣ 克隆仓库
+git clone https://github.com/ImogeneOctaviap794/Toolify.git
+cd Toolify
 
-### 选项 2: 使用 Python
+# 2️⃣ 配置文件
+cp config.example.yaml config.yaml
 
-#### 前提条件
+# 3️⃣ 初始化管理员账号（可选）
+python init_admin.py
 
-- Python 3.8+
+# 4️⃣ 启动服务
+docker-compose up -d --build
+```
 
-#### 步骤
+#### ✅ 访问服务
 
-1. **克隆仓库：**
+- 🌐 **API 服务**: `http://localhost:8000`
+- 🎨 **管理界面**: `http://localhost:8000/admin`
+- 👤 **默认账号**: `admin` / `admin123`
 
-   ```bash
-   git clone https://github.com/funnycups/toolify.git
-   cd toolify
-   ```
+> 💡 **提示**: 首次构建会自动编译前端，大约需要 2-3 分钟
 
-2. **安装依赖：**
+</details>
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 方式二：Python 直接运行
 
-3. **配置应用程序：**
+<details>
+<summary><b>🐍 使用 Python 本地部署</b></summary>
 
-   复制示例配置文件并进行编辑：
+#### 📋 前置要求
 
-   ```bash
-   cp config.example.yaml config.yaml
-   ```
+- ✅ Python 3.8+  
+- ✅ pip 包管理器
+- ✅ Node.js 18+（用于构建前端）
 
-   编辑 `config.yaml` 文件，设置您的上游服务、API 密钥以及允许的客户端密钥。
+#### 🔧 部署步骤
 
-4. **运行服务器：**
+```bash
+# 1️⃣ 克隆仓库
+git clone https://github.com/ImogeneOctaviap794/Toolify.git
+cd Toolify
 
-   ```bash
-   python main.py
-   ```
+# 2️⃣ 安装 Python 依赖
+pip install -r requirements.txt
 
-## 配置 (`config.yaml`)
+# 3️⃣ 配置文件
+cp config.example.yaml config.yaml
+# 编辑 config.yaml 设置您的上游服务和 API 密钥
 
-请参考 [`config.example.yaml`](config.example.yaml) 获取详细的配置选项说明。
+# 4️⃣ 初始化管理员（可选）
+python init_admin.py
 
-- **`server`**：中间件的主机、端口和超时设置。
-- **`upstream_services`**：上游 LLM 提供商列表。
-  - 定义 `base_url`、`api_key`、支持的 `models`，并设置一个服务为 `is_default: true`。
-- **`client_authentication`**：允许访问此中间件的客户端 `allowed_keys` 列表。
-- **`features`**：切换日志记录、角色转换和 API 密钥处理等功能。
-  - `key_passthrough`: 设置为 `true` 时，将直接把客户端提供的 API 密钥转发给上游服务，而不是使用 `upstream_services` 中配置的 `api_key`。
-  - `model_passthrough`: 设置为 `true` 时，将所有请求直接转发到名为 'openai' 的上游服务，忽略任何基于模型的路由规则。
-  - `prompt_template`: 自定义用于指导模型如何使用工具的系统提示词。
+# 5️⃣ 构建前端界面
+./build_frontend.sh
 
-## 使用方法
+# 6️⃣ 启动服务
+python main.py
+```
 
-Toolify 运行后，将您的客户端应用程序（例如使用 OpenAI SDK）的 `base_url` 配置为 Toolify 的地址。使用您配置的 `allowed_keys` 之一进行身份验证。
+#### ✅ 访问服务
+
+- 🌐 **API 服务**: `http://localhost:8000`
+- 🎨 **管理界面**: `http://localhost:8000/admin`
+- 👤 **默认账号**: `admin` / `admin123`
+
+</details>
+
+## ⚙️ 配置说明
+
+### 配置文件结构
+
+```yaml
+# 服务器配置
+server:
+  port: 8000           # 🔌 监听端口
+  host: "0.0.0.0"     # 🌐 监听地址
+  timeout: 180         # ⏱️ 请求超时（秒）
+
+# 上游服务配置
+upstream_services:
+  - name: "openai-primary"
+    service_type: "openai"      # 🏷️ 服务类型：openai/google/anthropic
+    base_url: "https://api.openai.com/v1"
+    api_key: "sk-..."
+    priority: 100                # 📊 优先级（数字越大越优先）
+    models: ["gpt-4", "gpt-4o"]
+
+# 客户端认证
+client_authentication:
+  allowed_keys:
+    - "sk-your-client-key-1"    # 🔑 允许访问的客户端密钥
+
+# 管理员认证（Web 界面）
+admin_authentication:
+  username: "admin"              # 👤 管理员用户名
+  password: "$2b$12$..."        # 🔐 bcrypt 加密密码
+  jwt_secret: "..."             # 🎫 JWT 签名密钥
+
+# 功能配置
+features:
+  enable_function_calling: true  # 🎯 启用函数调用
+  log_level: "INFO"             # 📋 日志级别
+  model_passthrough: true       # 🚀 模型透传模式
+```
+
+### 📝 配置参数说明
+
+<details>
+<summary><b>点击展开详细说明</b></summary>
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `server.port` | 服务监听端口 | `8000` |
+| `server.timeout` | 上游请求超时时间（秒） | `180` |
+| `upstream_services[].priority` | 服务优先级（数字越大越优先） | `0` |
+| `features.enable_function_calling` | 启用函数调用功能 | `true` |
+| `features.model_passthrough` | 使用所有服务按优先级路由 | `false` |
+| `features.key_passthrough` | 转发客户端 API Key | `false` |
+
+</details>
+
+## 📚 使用方法
+
+### OpenAI 格式调用
+
+<details open>
+<summary><b>使用 OpenAI SDK</b></summary>
 
 ```python
 from openai import OpenAI
 
+# 🔧 配置 Toolify 作为代理
 client = OpenAI(
-    base_url="http://localhost:8000/v1",  # Toolify 终结点
-    api_key="sk-my-secret-key-1"          # 您配置的客户端密钥
+    base_url="http://localhost:8000/v1",
+    api_key="sk-my-secret-key-1"  # 您的客户端密钥
 )
 
-# 其余的 OpenAI API 调用保持不变，包括工具定义。
+# 🎯 正常使用，完全兼容 OpenAI API
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[
+        {"role": "user", "content": "北京天气怎么样？"}
+    ],
+    tools=[{
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "获取天气信息",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string"}
+                },
+                "required": ["location"]
+            }
+        }
+    }]
+)
 ```
 
-Toolify 负责处理标准 OpenAI 工具格式与不支持的 LLM 所需的基于提示词的方法之间的转换。
+</details>
 
-## 多渠道优先级与故障转移
+### Anthropic 格式调用
 
-Toolify Admin 支持为同一个模型配置多个上游渠道，并根据优先级进行自动故障转移，显著提升服务的可用性和稳定性。
+<details>
+<summary><b>使用 Anthropic SDK</b></summary>
 
-### 功能特点
+```python
+import anthropic
 
-- **优先级机制**：为每个服务配置 `priority` 值（数字越大优先级越高，100 比 50 优先）
-- **无需默认服务**：移除 `is_default` 强制要求，未匹配模型时自动使用优先级最高的服务
-- **自动故障转移**：当高优先级渠道失败时，自动尝试下一优先级的渠道
-- **智能重试策略**：
-  - 对于 429（限流）和 5xx（服务器错误）：自动切换到备用渠道
-  - 对于 400/401/403（客户端错误）：不进行重试（因为换渠道也会失败）
-- **同模型多渠道**：可以为同一个模型配置多个 OpenAI 代理或镜像站
-- **透明切换**：对客户端完全透明，自动处理所有故障转移逻辑
+# 🔧 配置 Toolify 作为代理
+client = anthropic.Anthropic(
+    api_key="sk-my-secret-key-1",  # 您的客户端密钥
+    base_url="http://localhost:8000/v1"
+)
+
+# 🎯 使用 Anthropic Messages API
+message = client.messages.create(
+    model="claude-haiku-4.5",
+    max_tokens=1024,
+    tools=[{
+        "name": "get_weather",
+        "description": "获取天气信息",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "城市名称"}
+            },
+            "required": ["location"]
+        }
+    }],
+    messages=[
+        {"role": "user", "content": "北京天气怎么样？"}
+    ]
+)
+```
+
+> 💡 **提示**: Toolify 自动处理 Anthropic ↔ OpenAI 格式转换，上游仍然使用 OpenAI 格式
+
+</details>
+
+### cURL 调用示例
+
+<details>
+<summary><b>HTTP 直接调用</b></summary>
+
+```bash
+# OpenAI 格式
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-my-secret-key-1" \
+  -d '{
+    "model": "gpt-4",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+
+# Anthropic 格式
+curl -X POST http://localhost:8000/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-my-secret-key-1" \
+  -d '{
+    "model": "claude-haiku-4.5",
+    "max_tokens": 1024,
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+</details>
+
+## 🔄 多渠道优先级与故障转移
+
+> 💡 为同一模型配置多个上游渠道，自动故障转移，**99.9%** 服务可用性保障
+
+### 🎯 功能亮点
+
+<table>
+<tr>
+<td width="33%">
+
+#### 📊 优先级机制
+数字越大优先级越高  
+`100` > `50` > `10`
+
+</td>
+<td width="33%">
+
+#### 🔄 自动切换
+429/5xx 错误自动切换  
+客户端完全无感知
+
+</td>
+<td width="33%">
+
+#### 🎨 灵活配置
+支持多个 OpenAI 代理  
+镜像站、备用渠道
+
+</td>
+</tr>
+</table>
+
+### 💡 智能重试策略
+
+| 错误类型 | 处理方式 | 说明 |
+|---------|----------|------|
+| 🟡 429 Rate Limit | ✅ 自动切换 | 限流时立即使用备用渠道 |
+| 🔴 5xx Server Error | ✅ 自动切换 | 服务器错误切换到下一渠道 |
+| 🟠 400/401/403 Client Error | ❌ 不重试 | 客户端错误换渠道也会失败 |
+| 🔵 Network Timeout | ✅ 自动切换 | 网络超时切换备用服务 |
 
 ### 配置示例
 
@@ -220,69 +425,145 @@ upstream_services:
 - **模型匹配**：只有配置了相同模型的服务才会参与故障转移
 - **is_default 已弃用**：不再需要设置默认服务，系统自动使用优先级最高的服务作为兜底
 
-## Web 管理界面
+## 🎨 Web 管理界面
 
-Toolify 提供了一个现代化的 Web 管理界面，让您可以通过浏览器轻松管理所有配置。
+<div align="center">
 
-### 初始化管理员账号
+### ✨ 现代化可视化配置管理平台
 
-首次使用管理界面前，需要初始化管理员账号：
+**React 19 + TypeScript + Tailwind CSS + shadcn/ui**
+
+</div>
+
+### 🖥️ 界面预览
+
+<table>
+<tr>
+<td width="50%">
+
+#### 🔐 登录界面
+- 渐变背景设计
+- JWT Token 认证
+- bcrypt 密码加密
+
+</td>
+<td width="50%">
+
+#### ⚙️ 配置管理
+- 实时配置重载
+- 表单 / JSON 双模式
+- 响应式设计
+
+</td>
+</tr>
+</table>
+
+### 🚀 快速访问
 
 ```bash
+# 1️⃣ 初始化管理员账号
 python init_admin.py
+
+# 2️⃣ 访问管理界面
+# 浏览器打开: http://localhost:8000/admin
+
+# 3️⃣ 使用默认账号登录
+# 用户名: admin
+# 密码: admin123
 ```
 
-按照提示输入用户名和密码，脚本会自动生成哈希密码和 JWT 密钥，并更新 `config.yaml` 文件。
+### 📋 功能模块
 
-或者，您也可以手动在 `config.yaml` 中添加以下配置：
+<table>
+<tr>
+<td width="50%">
 
-```yaml
-admin_authentication:
-  username: "admin"
-  password: "$2b$12$..."  # 使用 bcrypt 哈希的密码
-  jwt_secret: "your-secure-random-jwt-secret-min-32-chars"
-```
+#### 🖥️ 服务器配置
+- 监听地址与端口
+- 请求超时设置
+- 实时状态监控
 
-### 访问管理界面
+#### 🔗 上游服务管理
+- 多渠道配置
+- 优先级设置
+- JSON 批量编辑
+- 服务类型标识
 
-1. 启动 Toolify 服务
-2. 在浏览器中访问 `http://localhost:8000/admin`
-3. 使用管理员账号登录
+</td>
+<td width="50%">
 
-### 功能特性
+#### 🔑 客户端认证
+- API Key 管理
+- 批量添加/删除
+- 密钥可见性控制
 
-- 📊 **服务器配置**：管理监听地址、端口和超时设置
-- 🔄 **上游服务管理**：添加、编辑、删除上游 LLM 服务配置
-- 🔑 **客户端认证**：管理客户端 API 密钥
-- ⚙️ **功能配置**：切换各项功能开关和行为参数
-- 💾 **实时保存**：配置修改后实时保存到 `config.yaml`
-- 🔐 **安全认证**：基于 JWT 的安全登录机制
+#### ⚙️ 功能配置
+- 函数调用开关
+- 日志级别控制
+- 模型透传模式
+- 自定义提示词
 
-### 前端开发
+</td>
+</tr>
+</table>
 
-如果您需要修改管理界面的前端代码：
+### 🛠️ 前端开发指南
+
+<details>
+<summary><b>修改管理界面</b></summary>
 
 ```bash
-# 安装依赖
+# 进入前端目录
 cd frontend
+
+# 安装依赖
 npm install
 
 # 开发模式（支持热重载）
 npm run dev
+# 访问 http://localhost:3000
 
 # 构建生产版本
 npm run build
 
-# 或使用构建脚本
+# 快速构建脚本
 cd ..
 ./build_frontend.sh
 ```
 
-前端技术栈：
-- React 19 + TypeScript
-- Vite 构建工具
-- Tailwind CSS + shadcn/ui 组件库
+#### 🎨 技术栈
 
-## 许可证
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| React | 19 | UI 框架 |
+| TypeScript | 5.0+ | 类型安全 |
+| Vite | 6.0+ | 构建工具 |
+| Tailwind CSS | 3.4+ | 样式框架 |
+| shadcn/ui | Latest | 组件库 |
+| Zustand | 5.0+ | 状态管理 |
 
-本项目采用 GPL-3.0-or-later 许可证。
+</details>
+
+---
+
+## 📄 许可证
+
+本项目采用 **GPL-3.0-or-later** 许可证。
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## ⭐ Star History
+
+如果这个项目对您有帮助，请给我们一个 Star ⭐
+
+---
+
+<div align="center">
+
+**Made with ❤️ by Toolify Admin Team**
+
+[GitHub](https://github.com/ImogeneOctaviap794/Toolify) • [Issues](https://github.com/ImogeneOctaviap794/Toolify/issues) • [原项目](https://github.com/funnycups/toolify)
+
+</div>

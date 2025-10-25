@@ -1,29 +1,72 @@
-# Toolify Admin
+<div align="center">
+
+# 🚀 Toolify Admin
+
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178c6.svg)](https://www.typescriptlang.org/)
+
+**Empower any LLM with Function Calling + Visual Admin Interface**
 
 [English](README.md) | [简体中文](README_zh.md)
 
-> **Project Origin**: This project is based on [funnycups/toolify](https://github.com/funnycups/toolify)  
-> **Key Enhancements**: Added web admin interface with visual configuration management and real-time config reload  
-> **Acknowledgments**: Special thanks to FunnyCups for creating the excellent Toolify middleware project
+[Quick Start](#-quick-start) • [Features](#-key-features) • [Documentation](#-usage) • [Admin UI](#-web-admin-interface) • [Contributing](#-contributing)
 
 ---
 
-**Empower any LLM with function calling capabilities, plus a visual admin interface.**
+### 📊 Project Origin & Acknowledgments
 
-Toolify Admin is an enhanced version of the Toolify middleware proxy with added management features. It injects OpenAI-compatible function calling capabilities into Large Language Models that lack native support, while providing a modern web-based admin interface for easy configuration management without manually editing YAML files.
+> Based on [funnycups/toolify](https://github.com/funnycups/toolify)  
+> Special thanks to **FunnyCups** for creating the excellent Toolify middleware
 
-## Key Features
+### ✨ Key Enhancements
 
-- **Universal Function Calling**: Enables function calling for LLMs or APIs that adhere to the OpenAI format but lack native support.
-- **Multiple Function Calls**: Supports executing multiple functions simultaneously in a single response.
-- **Flexible Initiation**: Allows function calls to be initiated at any stage of the model's output.
-- **Think Tag Compatibility**: Seamlessly handles `<think>` tags, ensuring they don't interfere with tool parsing.
-- **Streaming Support**: Fully supports streaming responses, detecting and parsing function calls on the fly.
-- **Multi-Service Routing**: Routes requests to different upstream services based on the requested model name.
-- **Multi-Channel Priority & Failover**: Configure multiple channels for the same model with priority-based automatic failover to improve service availability.
-- **Client Authentication**: Secures the middleware with configurable client API keys.
-- **Enhanced Context Awareness**: Provides LLMs with the details (name and parameters) of previous tool calls alongside the execution results, improving contextual understanding.
-- **Web Admin Interface**: Modern web-based UI for managing all configuration options visually with real-time config reload.
+- 🎨 **Web Admin UI** - React 19 + TypeScript visual configuration
+- ⚡ **Real-time Reload** - Config changes take effect instantly
+- 🔄 **Multi-Channel Failover** - Smart priority-based routing
+- 🌐 **Multi-API Support** - OpenAI + Anthropic Claude formats
+- 📱 **Responsive Design** - Perfect for mobile and desktop
+
+</div>
+
+---
+
+## 📖 Introduction
+
+**Toolify Admin** is a powerful LLM function calling middleware proxy designed for enterprise applications. It injects OpenAI-compatible function calling capabilities into Large Language Models through **Prompt Injection** technology, while providing a modern web-based admin interface for visual configuration management.
+
+## ✨ Key Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🎯 Function Calling
+
+- 🔌 **Universal Support** - Inject function calling into any LLM
+- 📦 **Multi-Function** - Execute multiple functions concurrently
+- ⚡ **Flexible Trigger** - Initiate calls at any stage
+- 🧠 **Think Tag Safe** - Seamlessly handle thinking process
+- 🌊 **Streaming** - Full streaming support with real-time parsing
+- 🎨 **Context Enhanced** - Improved model understanding
+
+</td>
+<td width="50%">
+
+### 🛡️ Enterprise Features
+
+- 🔄 **Multi-Channel Failover** - Smart priority-based routing
+- 🌐 **Multi-API Format** - OpenAI + Anthropic Claude support
+- 🔐 **Secure Auth** - JWT Token + bcrypt encryption
+- ⚡ **Real-time Reload** - Zero-downtime config updates
+- 📊 **Visual Management** - Modern web interface
+- 📱 **Responsive** - Works on desktop, tablet, mobile
+
+</td>
+</tr>
+</table>
 
 ## How It Works
 

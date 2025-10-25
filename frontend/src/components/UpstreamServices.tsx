@@ -201,9 +201,11 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         service.service_type === 'google' 
                           ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200'
+                          : service.service_type === 'anthropic'
+                          ? 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border border-orange-200'
                           : 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border border-purple-200'
                       }`}>
-                        {service.service_type === 'google' ? 'Google' : 'OpenAI'}
+                        {service.service_type === 'google' ? 'Google' : service.service_type === 'anthropic' ? 'Anthropic' : 'OpenAI'}
                       </span>
                     )}
                     {(!service.api_key || service.api_key.trim() === '') && (
@@ -270,9 +272,10 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                   >
                     <option value="openai">OpenAI</option>
                     <option value="google">Google</option>
+                    <option value="anthropic">Anthropic</option>
                   </select>
                   <p className="text-sm text-gray-500">
-                    服务提供商类型
+                    服务提供商类型（OpenAI 格式兼容）
                   </p>
                 </div>
 
