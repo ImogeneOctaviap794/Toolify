@@ -76,6 +76,38 @@
 4. **Parse Response**: Toolify analyzes the upstream response. If the trigger signal is detected, it parses the XML structure to extract the function calls.
 5. **Format Response**: It transforms the parsed tool calls into the standard OpenAI `tool_calls` format and sends it back to the client.
 
+## 🏗️ Architecture
+
+The codebase follows a modular architecture for better maintainability:
+
+```
+toolify/
+├── main.py                    # FastAPI application & routes
+├── models.py                  # Pydantic data models
+├── token_counter.py           # Token counting utilities
+├── tool_mapping.py            # Tool call mapping manager
+├── message_processor.py       # Message preprocessing
+├── upstream_router.py         # Upstream service routing
+├── streaming_proxy.py         # Streaming response handler
+├── anthropic_adapter.py       # Anthropic API conversion
+├── config_loader.py           # Configuration management
+├── admin_auth.py              # Admin authentication
+└── function_calling/          # Function calling module
+    ├── __init__.py
+    ├── parser.py              # XML parsing logic
+    ├── prompt.py              # Prompt generation
+    └── streaming.py           # Streaming detection
+```
+
+### Key Modules
+
+- **`function_calling/`**: Core function calling logic (prompt generation, XML parsing, streaming detection)
+- **`models.py`**: Type-safe request/response models using Pydantic
+- **`token_counter.py`**: Accurate token counting for various models
+- **`upstream_router.py`**: Smart routing with priority-based failover
+- **`streaming_proxy.py`**: Handle streaming responses with function call detection
+- **`anthropic_adapter.py`**: Seamless format conversion between OpenAI and Anthropic APIs
+
 ## Installation and Setup
 
 You can run Toolify using Docker Compose or Python directly.

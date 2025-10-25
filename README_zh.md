@@ -92,6 +92,38 @@ graph LR
 | 4️⃣ **智能解析** | 检测并解析 XML 格式的工具调用 | 支持嵌套、Think 块、流式 |
 | 5️⃣ **格式转换** | 转换为标准 OpenAI/Anthropic 格式 | 完整兼容官方 SDK |
 
+## 🏗️ 架构设计
+
+代码采用模块化架构设计，提升可维护性：
+
+```
+toolify/
+├── main.py                    # FastAPI 应用入口 & 路由定义
+├── models.py                  # Pydantic 数据模型
+├── token_counter.py           # Token 计数工具
+├── tool_mapping.py            # 工具调用映射管理器
+├── message_processor.py       # 消息预处理模块
+├── upstream_router.py         # 上游服务路由
+├── streaming_proxy.py         # 流式响应处理器
+├── anthropic_adapter.py       # Anthropic API 转换
+├── config_loader.py           # 配置管理
+├── admin_auth.py              # 管理员认证
+└── function_calling/          # 函数调用核心模块
+    ├── __init__.py
+    ├── parser.py              # XML 解析逻辑
+    ├── prompt.py              # 提示词生成
+    └── streaming.py           # 流式检测
+```
+
+### 核心模块说明
+
+- **`function_calling/`**: 函数调用核心逻辑（提示词生成、XML解析、流式检测）
+- **`models.py`**: 使用 Pydantic 的类型安全请求/响应模型
+- **`token_counter.py`**: 支持多种模型的精确 Token 计数
+- **`upstream_router.py`**: 智能路由，支持优先级故障转移
+- **`streaming_proxy.py`**: 处理流式响应并检测函数调用
+- **`anthropic_adapter.py`**: OpenAI 和 Anthropic API 格式无缝转换
+
 ## 🚀 快速开始
 
 ### 方式一：Docker 部署（推荐⭐）
