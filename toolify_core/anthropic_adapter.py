@@ -182,94 +182,145 @@ def openai_to_anthropic_response(openai_resp: Dict[str, Any], stream: bool = Fal
 
 async def stream_openai_to_anthropic(openai_stream_generator):
     """Convert OpenAI streaming response to Anthropic streaming format."""
+    logger.debug("🔧 Starting OpenAI to Anthropic stream conversion")
+    
     # Send message_start event
     message_id = f"msg_{uuid.uuid4().hex}"
-    yield f"event: message_start\ndata: {json.dumps({'type': 'message_start', 'message': {'id': message_id, 'type': 'message', 'role': 'assistant', 'content': [], 'model': '', 'usage': {'input_tokens': 0, 'output_tokens': 0}}})}\n\n"
+    message_start = {
+        'type': 'message_start',
+        'message': {
+            'id': message_id,
+            'type': 'message',
+            'role': 'assistant',
+            'content': [],
+            'model': '',
+            'usage': {'input_tokens': 0, 'output_tokens': 0}
+        }
+    }
+    yield f"event: message_start\ndata: {json.dumps(message_start)}\n\n"
+    logger.debug(f"🔧 Sent message_start event: {message_id}")
     
     # Track current content block
     current_block_index = 0
     current_block_type = None
     tool_call_started = False
     current_tool_call = {}
+    chunk_count = 0
     
-    async for chunk in openai_stream_generator:
-        if chunk.startswith(b"data: "):
-            try:
-                line_data = chunk[6:].decode('utf-8').strip()
-                if line_data == "[DONE]":
-                    # Send content_block_stop and message_stop events
-                    if current_block_type:
-                        yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': current_block_index})}\n\n"
+    try:
+        async for chunk in openai_stream_generator:
+            chunk_count += 1
+            logger.debug(f"🔧 Processing chunk #{chunk_count}, size: {len(chunk) if isinstance(chunk, bytes) else 'N/A'} bytes")
+            
+            if chunk.startswith(b"data: "):
+                try:
+                    line_data = chunk[6:].decode('utf-8').strip()
+                    logger.debug(f"🔧 Decoded chunk data: {line_data[:100]}{'...' if len(line_data) > 100 else ''}")
                     
-                    # Determine stop_reason based on last block type
-                    stop_reason = "tool_use" if current_block_type == "tool_use" else "end_turn"
-                    yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': stop_reason}, 'usage': {'output_tokens': 0}})}\n\n"
-                    yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
-                    break
-                elif line_data:
-                    chunk_json = json.loads(line_data)
-                    if "choices" in chunk_json and len(chunk_json["choices"]) > 0:
-                        choice = chunk_json["choices"][0]
-                        delta = choice.get("delta", {})
+                    if line_data == "[DONE]":
+                        logger.debug("🔧 Received [DONE] marker, finalizing stream")
+                        # Send content_block_stop and message_stop events
+                        if current_block_type:
+                            stop_event = {'type': 'content_block_stop', 'index': current_block_index}
+                            yield f"event: content_block_stop\ndata: {json.dumps(stop_event)}\n\n"
+                            logger.debug(f"🔧 Sent content_block_stop: {stop_event}")
                         
-                        # Handle text content
-                        content = delta.get("content", "")
-                        if content:
-                            if current_block_type != "text":
-                                # Start new text block
-                                if current_block_type:
-                                    yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': current_block_index})}\n\n"
-                                    current_block_index += 1
-                                current_block_type = "text"
-                                yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': current_block_index, 'content_block': {'type': 'text', 'text': ''}})}\n\n"
+                        # Determine stop_reason based on last block type
+                        stop_reason = "tool_use" if current_block_type == "tool_use" else "end_turn"
+                        delta_event = {'type': 'message_delta', 'delta': {'stop_reason': stop_reason}, 'usage': {'output_tokens': 0}}
+                        yield f"event: message_delta\ndata: {json.dumps(delta_event)}\n\n"
+                        logger.debug(f"🔧 Sent message_delta with stop_reason: {stop_reason}")
+                        
+                        yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
+                        logger.debug("🔧 Sent message_stop event")
+                        break
+                    elif line_data:
+                        try:
+                            chunk_json = json.loads(line_data)
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"⚠️ Failed to parse JSON: {e}, data: {line_data[:200]}")
+                            continue
+                        
+                        if "choices" in chunk_json and len(chunk_json["choices"]) > 0:
+                            choice = chunk_json["choices"][0]
+                            delta = choice.get("delta", {})
+                            logger.debug(f"🔧 Delta content: role={delta.get('role')}, content={bool(delta.get('content'))}, tool_calls={bool(delta.get('tool_calls'))}")
                             
-                            # Send content_block_delta event
-                            yield f"event: content_block_delta\ndata: {json.dumps({'type': 'content_block_delta', 'index': current_block_index, 'delta': {'type': 'text_delta', 'text': content}})}\n\n"
-                        
-                        # Handle tool_calls
-                        tool_calls = delta.get("tool_calls")
-                        if tool_calls:
-                            for tool_call_delta in tool_calls:
-                                tc_index = tool_call_delta.get("index", 0)
-                                
-                                # Start new tool_use block if needed
-                                if not tool_call_started or current_block_type != "tool_use":
-                                    if current_block_type and current_block_type != "tool_use":
+                            # Handle text content
+                            content = delta.get("content", "")
+                            if content:
+                                if current_block_type != "text":
+                                    # Start new text block
+                                    if current_block_type:
                                         yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': current_block_index})}\n\n"
                                         current_block_index += 1
+                                    current_block_type = "text"
+                                    yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': current_block_index, 'content_block': {'type': 'text', 'text': ''}})}\n\n"
+                                
+                                # Send content_block_delta event
+                                yield f"event: content_block_delta\ndata: {json.dumps({'type': 'content_block_delta', 'index': current_block_index, 'delta': {'type': 'text_delta', 'text': content}})}\n\n"
+                            
+                            # Handle tool_calls
+                            tool_calls = delta.get("tool_calls")
+                            if tool_calls:
+                                for tool_call_delta in tool_calls:
+                                    tc_index = tool_call_delta.get("index", 0)
                                     
-                                    current_block_type = "tool_use"
-                                    tool_call_started = True
+                                    # Start new tool_use block if needed
+                                    if not tool_call_started or current_block_type != "tool_use":
+                                        if current_block_type and current_block_type != "tool_use":
+                                            yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': current_block_index})}\n\n"
+                                            current_block_index += 1
+                                        
+                                        current_block_type = "tool_use"
+                                        tool_call_started = True
+                                        
+                                        # Initialize tool call tracking
+                                        tool_id = tool_call_delta.get("id", f"toolu_{uuid.uuid4().hex}")
+                                        current_tool_call = {"id": tool_id, "name": "", "input": ""}
+                                        
+                                        # Get function name and id
+                                        if "function" in tool_call_delta:
+                                            func = tool_call_delta["function"]
+                                            if "name" in func:
+                                                current_tool_call["name"] = func["name"]
+                                        
+                                        # Send tool_use start event
+                                        yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': current_block_index, 'content_block': {'type': 'tool_use', 'id': current_tool_call['id'], 'name': current_tool_call['name'], 'input': {{}}}})}\n\n"
                                     
-                                    # Initialize tool call tracking
-                                    tool_id = tool_call_delta.get("id", f"toolu_{uuid.uuid4().hex}")
-                                    current_tool_call = {"id": tool_id, "name": "", "input": ""}
-                                    
-                                    # Get function name and id
+                                    # Accumulate function arguments
                                     if "function" in tool_call_delta:
                                         func = tool_call_delta["function"]
-                                        if "name" in func:
-                                            current_tool_call["name"] = func["name"]
-                                    
-                                    # Send tool_use start event
-                                    yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': current_block_index, 'content_block': {'type': 'tool_use', 'id': current_tool_call['id'], 'name': current_tool_call['name'], 'input': {{}}}})}\n\n"
-                                
-                                # Accumulate function arguments
-                                if "function" in tool_call_delta:
-                                    func = tool_call_delta["function"]
-                                    if "arguments" in func:
-                                        args_chunk = func["arguments"]
-                                        current_tool_call["input"] += args_chunk
-                                        # Send input delta
-                                        yield f"event: content_block_delta\ndata: {json.dumps({'type': 'content_block_delta', 'index': current_block_index, 'delta': {'type': 'input_json_delta', 'partial_json': args_chunk}})}\n\n"
-                        
-                        # Handle finish_reason
-                        finish_reason = choice.get("finish_reason")
-                        if finish_reason:
-                            # This will be handled in [DONE]
-                            pass
+                                        if "arguments" in func:
+                                            args_chunk = func["arguments"]
+                                            current_tool_call["input"] += args_chunk
+                                            # Send input delta
+                                            yield f"event: content_block_delta\ndata: {json.dumps({'type': 'content_block_delta', 'index': current_block_index, 'delta': {'type': 'input_json_delta', 'partial_json': args_chunk}})}\n\n"
                             
-            except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as e:
-                logger.debug(f"🔧 Error parsing streaming chunk: {e}")
-                pass
+                            # Handle finish_reason
+                            finish_reason = choice.get("finish_reason")
+                            if finish_reason:
+                                # This will be handled in [DONE]
+                                pass
+                                
+                except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as e:
+                    logger.warning(f"⚠️ Error parsing streaming chunk: {e}, chunk: {chunk[:200] if isinstance(chunk, bytes) else chunk}")
+                    pass
+    
+    except Exception as e:
+        logger.error(f"❌ Stream conversion error: {type(e).__name__}: {e}")
+        logger.error(f"❌ Processed {chunk_count} chunks before error")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        # Send error event to client
+        error_event = {
+            'type': 'error',
+            'error': {
+                'type': 'api_error',
+                'message': f'Stream conversion error: {str(e)}'
+            }
+        }
+        yield f"event: error\ndata: {json.dumps(error_event)}\n\n"
+    finally:
+        logger.debug(f"🔧 Stream conversion completed, total chunks: {chunk_count}")
 

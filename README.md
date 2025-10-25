@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Toolify Admin
+# 🚀 Toolify-code
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -35,7 +35,7 @@
 
 ## 📖 Introduction
 
-**Toolify Admin** is a powerful LLM function calling middleware proxy designed for enterprise applications. It injects OpenAI-compatible function calling capabilities into Large Language Models through **Prompt Injection** technology, while providing a modern web-based admin interface for visual configuration management.
+**Toolify-code** is a powerful LLM function calling middleware proxy designed for enterprise applications. It injects OpenAI-compatible function calling capabilities into Large Language Models through **Prompt Injection** technology, while providing a modern web-based admin interface for visual configuration management.
 
 ## ✨ Key Features
 
@@ -252,8 +252,8 @@ This is the recommended way for easy deployment.
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/ImogeneOctaviap794/Toolify.git
-   cd Toolify
+   git clone https://github.com/ImogeneOctaviap794/Toolify-code.git
+   cd Toolify-code
    ```
 
 2. **Configure the application:**
@@ -484,6 +484,38 @@ Frontend Tech Stack:
 - React 19 + TypeScript
 - Vite build tool
 - Tailwind CSS + shadcn/ui component library
+
+## Configuration Examples
+
+### Per-Service Function Calling Control
+
+```yaml
+upstream_services:
+  - name: "openai-with-injection"
+    inject_function_calling: true    # Enable Toolify injection
+    optimize_prompt: true             # Use optimized prompt
+    
+  - name: "openai-native"
+    inject_function_calling: false   # Use native function calling API
+```
+
+### Model Redirection
+
+```yaml
+upstream_services:
+  - name: "openai"
+    model_mapping:
+      gpt-4: gpt-4o           # Client requests gpt-4 → Actually use gpt-4o
+      gpt-3.5: gpt-4o-mini    # Client requests gpt-3.5 → Actually use gpt-4o-mini
+      claude-2: claude-3      # Works with model names
+```
+
+### Prompt Optimization
+
+When enabled, function calling prompts are simplified:
+- **Detailed Mode** (default): 50,679 chars, ~12,669 tokens (17 tools)
+- **Optimized Mode**: ~15,000 chars, ~4,000 tokens (17 tools)
+- **Savings**: 60-70% reduction in prompt tokens ✅
 
 ## License
 

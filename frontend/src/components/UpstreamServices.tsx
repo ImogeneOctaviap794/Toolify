@@ -27,6 +27,9 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
       description: '',
       is_default: false,
       priority: config.upstream_services.length * 10,
+      inject_function_calling: null,  // null = inherit from global
+      optimize_prompt: false,
+      model_mapping: {},
       models: []
     }
     setConfig({
@@ -65,6 +68,50 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
       .map((m) => m.trim())
       .filter((m) => m.length > 0)
     updateService(index, 'models', models)
+  }
+
+  const addModelMapping = (serviceIndex: number) => {
+    const services = [...config.upstream_services]
+    const service = services[serviceIndex]
+    if (!service.model_mapping) {
+      service.model_mapping = {}
+    }
+    // Add an empty mapping (user will fill in)
+    service.model_mapping[''] = ''
+    setConfig({
+      ...config,
+      upstream_services: services
+    })
+  }
+
+  const updateModelMapping = (serviceIndex: number, oldKey: string, newKey: string, newValue: string) => {
+    const services = [...config.upstream_services]
+    const service = services[serviceIndex]
+    if (!service.model_mapping) {
+      service.model_mapping = {}
+    }
+    // Remove old key if it changed
+    if (oldKey !== newKey && oldKey in service.model_mapping) {
+      delete service.model_mapping[oldKey]
+    }
+    // Set new mapping (allow empty keys temporarily for user input)
+    service.model_mapping[newKey] = newValue
+    setConfig({
+      ...config,
+      upstream_services: services
+    })
+  }
+
+  const removeModelMapping = (serviceIndex: number, key: string) => {
+    const services = [...config.upstream_services]
+    const service = services[serviceIndex]
+    if (service.model_mapping) {
+      delete service.model_mapping[key]
+    }
+    setConfig({
+      ...config,
+      upstream_services: services
+    })
   }
 
   const toggleExpand = (index: number) => {
@@ -325,25 +372,123 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                   </p>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label>支持的模型（每行一个）</Label>
-                  <textarea
-                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={service.models.join('\n')}
-                    onChange={(e) => updateModels(index, e.target.value)}
-                    placeholder="gpt-3.5-turbo&#10;gpt-4&#10;claude-2"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    支持别名格式：alias:real-model（如 gemini:gemini-2.5-pro）
+                <div className="space-y-3 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">🔄 模型重定向配置</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addModelMapping(index)}
+                      className="text-xs"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      添加映射
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {Object.entries(service.model_mapping || {}).filter(([k]) => k !== '').map(([clientModel, upstreamModel], mapIdx) => (
+                      <div key={mapIdx} className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
+                        <div className="flex-1 grid grid-cols-2 gap-2 items-center">
+                          <div>
+                            <Input
+                              value={clientModel}
+                              onChange={(e) => updateModelMapping(index, clientModel, e.target.value, upstreamModel)}
+                              placeholder="客户端请求模型"
+                              className="text-sm"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">如：gpt-4</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 font-bold">→</span>
+                            <div className="flex-1">
+                              <Input
+                                value={upstreamModel}
+                                onChange={(e) => updateModelMapping(index, clientModel, clientModel, e.target.value)}
+                                placeholder="实际上游模型"
+                                className="text-sm"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">如：gpt-4o</p>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeModelMapping(index, clientModel)}
+                          className="hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    
+                    {(!service.model_mapping || Object.keys(service.model_mapping).length === 0) && (
+                      <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                        暂无模型重定向配置，点击"添加映射"开始配置
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    💡 <strong>模型重定向</strong>：客户端请求 gpt-4 时，实际向上游请求 gpt-4o
                   </p>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-600">或直接配置支持的模型（每行一个，不重定向）</Label>
+                    <textarea
+                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={service.models.join('\n')}
+                      onChange={(e) => updateModels(index, e.target.value)}
+                      placeholder="gpt-3.5-turbo&#10;gpt-4&#10;claude-2"
+                    />
+                    <p className="text-xs text-gray-500">
+                      支持别名：alias:model（如 gemini:gemini-2.5-pro）
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={service.is_default}
-                    onCheckedChange={(checked) => updateService(index, 'is_default', checked)}
-                  />
-                  <Label>设为默认服务</Label>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex items-center space-x-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                      <Switch
+                        checked={service.is_default}
+                        onCheckedChange={(checked) => updateService(index, 'is_default', checked)}
+                      />
+                      <div>
+                        <Label className="font-medium">设为默认服务</Label>
+                        <p className="text-xs text-gray-500 mt-0.5">未匹配模型时使用</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                      <Switch
+                        checked={service.inject_function_calling ?? true}
+                        onCheckedChange={(checked) => updateService(index, 'inject_function_calling', checked)}
+                        className="data-[state=checked]:bg-blue-500"
+                      />
+                      <div>
+                        <Label className="font-medium text-blue-900">🎆 启用函数调用注入</Label>
+                        <p className="text-xs text-blue-600 mt-0.5">为此服务注入 Toolify 能力</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 p-3 rounded-lg bg-gradient-to-r from-cyan-50 to-sky-50 border border-cyan-200">
+                    <Switch
+                      checked={service.optimize_prompt === true}
+                      onCheckedChange={(checked) => updateService(index, 'optimize_prompt', checked)}
+                      className="data-[state=checked]:bg-cyan-500"
+                    />
+                    <div className="flex-1">
+                      <Label className="font-medium text-cyan-900">⚡ Prompt 优化模式</Label>
+                      <p className="text-xs text-cyan-700 mt-0.5">
+                        生成精简版提示词，减少 50-70% Token 用量（推荐 10+ 工具时启用）
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

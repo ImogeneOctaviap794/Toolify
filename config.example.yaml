@@ -16,6 +16,9 @@ upstream_services:
     description: "OpenAI Official Service"
     is_default: true  # Deprecated field, use priority instead
     priority: 100  # Priority level (higher number = higher priority)
+    inject_function_calling: null  # null = inherit from global setting, true = force enable, false = force disable
+    optimize_prompt: false  # Optimize prompt to reduce token usage (recommended for 10+ tools)
+    model_mapping: {}  # Model redirect: client request model -> actual upstream model (e.g., gpt-4: gpt-4o)
     models:
       - "gpt-3.5-turbo"
       - "gpt-3.5-turbo-16k"
@@ -65,7 +68,7 @@ admin_authentication:
 
 # Feature configuration
 features:
-  enable_function_calling: true  # Enable function calling feature
+  enable_function_calling: true  # Enable function calling feature globally (can be overridden per service)
   log_level: "INFO"              # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL, or DISABLED
   convert_developer_to_system: true  # Whether to convert the developer role to the system role
   key_passthrough: false          # If true, directly forward client-provided API key to upstream instead of using configured upstream key

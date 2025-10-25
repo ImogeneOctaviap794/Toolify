@@ -168,6 +168,13 @@ async def stream_proxy_with_fc_transform(
                     except (json.JSONDecodeError, IndexError):
                         yield line + "\n\n"
 
+    except httpx.RemoteProtocolError as e:
+        logger.error(f"❌ Remote protocol error (connection closed): {e}")
+        logger.error(f"❌ This usually means the upstream server closed the connection prematurely")
+        logger.debug("🔧 Upstream closed connection prematurely, ending stream response")
+        # Don't send error to client, just end the stream gracefully
+        return
+    
     except httpx.RequestError as e:
         logger.error(f"❌ Failed to connect to upstream service: {e}")
         logger.error(f"❌ Error type: {type(e).__name__}")

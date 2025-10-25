@@ -34,23 +34,6 @@ export default function Features({ config, setConfig }: FeaturesProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-6">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
-            <div className="space-y-1">
-              <Label className="font-medium text-gray-800 flex items-center gap-2">
-                <span className="text-blue-500">🎆</span>
-                启用函数调用
-              </Label>
-              <p className="text-sm text-gray-600">
-                为不支持原生函数调用的 LLM 注入函数调用能力
-              </p>
-            </div>
-            <Switch
-              checked={config.features.enable_function_calling}
-              onCheckedChange={(checked) => updateFeature('enable_function_calling', checked)}
-              className="data-[state=checked]:bg-blue-500"
-            />
-          </div>
-
           <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200">
             <div className="space-y-1">
               <Label className="font-medium text-gray-800 flex items-center gap-2">

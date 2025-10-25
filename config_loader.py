@@ -23,9 +23,12 @@ class UpstreamService(BaseModel):
     base_url: str = Field(description="Service base URL")
     api_key: str = Field(description="API key")
     models: List[str] = Field(default_factory=list, description="List of supported models")
+    model_mapping: Dict[str, str] = Field(default_factory=dict, description="Model redirect mapping: {client_model: upstream_model}")
     description: str = Field(default="", description="Service description")
     is_default: bool = Field(default=False, description="Is default service (deprecated, use priority instead)")
     priority: int = Field(default=0, description="Priority level (higher number = higher priority)")
+    inject_function_calling: Optional[bool] = Field(default=None, description="Enable function calling injection for this service (None = inherit from global setting)")
+    optimize_prompt: bool = Field(default=False, description="Optimize prompt to reduce token usage for this service")
     
     @field_validator('base_url')
     def validate_base_url(cls, v):
@@ -93,7 +96,7 @@ class AdminAuthConfig(BaseModel):
 
 class FeaturesConfig(BaseModel):
     """Feature configuration"""
-    enable_function_calling: bool = Field(default=True, description="Enable function calling")
+    enable_function_calling: bool = Field(default=True, description="Enable function calling globally (can be overridden per service)")
     log_level: str = Field(default="INFO", description="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL, or DISABLED")
     convert_developer_to_system: bool = Field(default=True, description="Convert developer role to system role")
     prompt_template: Optional[str] = Field(default=None, description="Custom prompt template for function calling")

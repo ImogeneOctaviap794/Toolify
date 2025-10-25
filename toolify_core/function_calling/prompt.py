@@ -103,9 +103,16 @@ Now please be ready to strictly follow the above specifications.
 """
 
 
-def generate_function_prompt(tools: List[Any], trigger_signal: str, custom_template: str = None) -> Tuple[str, str]:
+def generate_function_prompt(tools: List[Any], trigger_signal: str, custom_template: str = None, optimize: bool = False) -> Tuple[str, str]:
     """
     Generate injected system prompt based on tools definition in client request.
+    
+    Args:
+        tools: List of tool definitions
+        trigger_signal: Unique trigger signal for function calling
+        custom_template: Custom prompt template (optional)
+        optimize: If True, generate simplified prompt to reduce token usage
+    
     Returns: (prompt_content, trigger_signal)
     """
     tools_list_str = []
@@ -124,76 +131,116 @@ def generate_function_prompt(tools: List[Any], trigger_signal: str, custom_templ
             f"{p_name} ({(p_info or {}).get('type', 'any')})" for p_name, p_info in props.items()
         ]) or "None"
 
-        # Build detailed parameter spec for prompt injection (default enabled)
+        # Build parameter spec - detailed or simplified based on optimize flag
         detail_lines: List[str] = []
-        for p_name, p_info in props.items():
-            p_info = p_info or {}
-            p_type = p_info.get("type", "any")
-            is_required = "Yes" if p_name in required_list else "No"
-            p_desc = p_info.get("description")
-            enum_vals = p_info.get("enum")
-            default_val = p_info.get("default")
-            examples_val = p_info.get("examples") or p_info.get("example")
+        
+        if optimize:
+            # Simplified mode: only essential information
+            for p_name, p_info in props.items():
+                p_info = p_info or {}
+                p_type = p_info.get("type", "any")
+                is_required = "required" if p_name in required_list else "optional"
+                p_desc = p_info.get("description", "")
+                
+                # Super concise format
+                if p_desc and len(p_desc) > 100:
+                    p_desc = p_desc[:97] + "..."
+                
+                if p_desc:
+                    detail_lines.append(f"  • {p_name} ({p_type}, {is_required}): {p_desc}")
+                else:
+                    detail_lines.append(f"  • {p_name} ({p_type}, {is_required})")
+        else:
+            # Detailed mode: comprehensive information
+            for p_name, p_info in props.items():
+                p_info = p_info or {}
+                p_type = p_info.get("type", "any")
+                is_required = "Yes" if p_name in required_list else "No"
+                p_desc = p_info.get("description")
+                enum_vals = p_info.get("enum")
+                default_val = p_info.get("default")
+                examples_val = p_info.get("examples") or p_info.get("example")
 
-            # Common constraints and hints
-            constraints: Dict[str, Any] = {}
-            for key in [
-                "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
-                "minLength", "maxLength", "pattern", "format",
-                "minItems", "maxItems", "uniqueItems"
-            ]:
-                if key in p_info:
-                    constraints[key] = p_info.get(key)
+                # Common constraints and hints
+                constraints: Dict[str, Any] = {}
+                for key in [
+                    "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+                    "minLength", "maxLength", "pattern", "format",
+                    "minItems", "maxItems", "uniqueItems"
+                ]:
+                    if key in p_info:
+                        constraints[key] = p_info.get(key)
 
-            # Array item type hint
-            if p_type == "array":
-                items = p_info.get("items") or {}
-                if isinstance(items, dict):
-                    itype = items.get("type")
-                    if itype:
-                        constraints["items.type"] = itype
+                # Array item type hint
+                if p_type == "array":
+                    items = p_info.get("items") or {}
+                    if isinstance(items, dict):
+                        itype = items.get("type")
+                        if itype:
+                            constraints["items.type"] = itype
 
-            # Compose pretty lines
-            detail_lines.append(f"- {p_name}:")
-            detail_lines.append(f"  - type: {p_type}")
-            detail_lines.append(f"  - required: {is_required}")
-            if p_desc:
-                detail_lines.append(f"  - description: {p_desc}")
-            if enum_vals is not None:
-                try:
-                    detail_lines.append(f"  - enum: {json.dumps(enum_vals, ensure_ascii=False)}")
-                except Exception:
-                    detail_lines.append(f"  - enum: {enum_vals}")
-            if default_val is not None:
-                try:
-                    detail_lines.append(f"  - default: {json.dumps(default_val, ensure_ascii=False)}")
-                except Exception:
-                    detail_lines.append(f"  - default: {default_val}")
-            if examples_val is not None:
-                try:
-                    detail_lines.append(f"  - examples: {json.dumps(examples_val, ensure_ascii=False)}")
-                except Exception:
-                    detail_lines.append(f"  - examples: {examples_val}")
-            if constraints:
-                try:
-                    detail_lines.append(f"  - constraints: {json.dumps(constraints, ensure_ascii=False)}")
-                except Exception:
-                    detail_lines.append(f"  - constraints: {constraints}")
+                # Compose pretty lines
+                detail_lines.append(f"- {p_name}:")
+                detail_lines.append(f"  - type: {p_type}")
+                detail_lines.append(f"  - required: {is_required}")
+                if p_desc:
+                    detail_lines.append(f"  - description: {p_desc}")
+                if enum_vals is not None:
+                    try:
+                        detail_lines.append(f"  - enum: {json.dumps(enum_vals, ensure_ascii=False)}")
+                    except Exception:
+                        detail_lines.append(f"  - enum: {enum_vals}")
+                if default_val is not None:
+                    try:
+                        detail_lines.append(f"  - default: {json.dumps(default_val, ensure_ascii=False)}")
+                    except Exception:
+                        detail_lines.append(f"  - default: {default_val}")
+                if examples_val is not None:
+                    try:
+                        detail_lines.append(f"  - examples: {json.dumps(examples_val, ensure_ascii=False)}")
+                    except Exception:
+                        detail_lines.append(f"  - examples: {examples_val}")
+                if constraints:
+                    try:
+                        detail_lines.append(f"  - constraints: {json.dumps(constraints, ensure_ascii=False)}")
+                    except Exception:
+                        detail_lines.append(f"  - constraints: {constraints}")
 
         detail_block = "\n".join(detail_lines) if detail_lines else "(no parameter details)"
 
-        desc_block = f"```\n{description}\n```" if description else "None"
+        # Shorten description if in optimize mode
+        if optimize and description and len(description) > 200:
+            desc_block = f"{description[:197]}..."
+        else:
+            desc_block = f"```\n{description}\n```" if description else "None"
 
-        tools_list_str.append(
-            f"{i + 1}. <tool name=\"{name}\">\n"
-            f"   Description:\n{desc_block}\n"
-            f"   Parameters summary: {params_summary}\n"
-            f"   Required parameters: {', '.join(required_list) if required_list else 'None'}\n"
-            f"   Parameter details:\n{detail_block}"
-        )
+        # Build tool list entry
+        if optimize:
+            # Simplified format
+            tools_list_str.append(
+                f"{i + 1}. {name}\n"
+                f"   {desc_block}\n"
+                f"   Parameters: {', '.join(required_list) if required_list else 'None'}\n"
+                f"{detail_block}"
+            )
+        else:
+            # Detailed format
+            tools_list_str.append(
+                f"{i + 1}. <tool name=\"{name}\">\n"
+                f"   Description:\n{desc_block}\n"
+                f"   Parameters summary: {params_summary}\n"
+                f"   Required parameters: {', '.join(required_list) if required_list else 'None'}\n"
+                f"   Parameter details:\n{detail_block}"
+            )
     
     prompt_template = get_function_call_prompt_template(trigger_signal, custom_template)
     prompt_content = prompt_template.replace("{tools_list}", "\n\n".join(tools_list_str))
+    
+    # Log optimization info
+    if optimize:
+        logger.info(f"🔧 Generated optimized prompt: {len(prompt_content)} chars (optimization enabled)")
+    else:
+        logger.debug(f"🔧 Generated detailed prompt: {len(prompt_content)} chars")
     
     return prompt_content, trigger_signal
 

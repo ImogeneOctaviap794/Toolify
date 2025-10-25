@@ -74,11 +74,15 @@ def preprocess_messages(messages: List[Dict[str, Any]], trigger_signal: str, con
     """Preprocess messages, convert tool-type messages to AI-understandable format, return dictionary list to avoid Pydantic validation issues."""
     processed_messages = []
     
-    for message in messages:
+    logger.debug(f"🔧 Preprocessing {len(messages)} messages")
+    
+    for idx, message in enumerate(messages):
         if isinstance(message, dict):
             if message.get("role") == "tool":
                 tool_call_id = message.get("tool_call_id")
                 content = message.get("content")
+                
+                logger.debug(f"🔧 Message #{idx}: role=tool, tool_call_id={tool_call_id}, has_content={bool(content)}")
                 
                 if tool_call_id and content:
                     formatted_content = format_tool_result_for_ai(tool_call_id, content)
@@ -87,10 +91,10 @@ def preprocess_messages(messages: List[Dict[str, Any]], trigger_signal: str, con
                         "content": formatted_content
                     }
                     processed_messages.append(processed_message)
-                    logger.debug(f"🔧 Converted tool message to user message: tool_call_id={tool_call_id}")
+                    logger.info(f"✅ Converted tool message #{idx} to user message: tool_call_id={tool_call_id}")
                 else:
-                    logger.debug(
-                        f"🔧 Skipped invalid tool message: tool_call_id={tool_call_id}, content={bool(content)}")
+                    logger.warning(
+                        f"⚠️ Skipped invalid tool message #{idx}: tool_call_id={tool_call_id}, content={bool(content)}")
             elif message.get("role") == "assistant" and "tool_calls" in message and message["tool_calls"]:
                 tool_calls = message.get("tool_calls", [])
                 formatted_tool_calls_str = format_assistant_tool_calls_for_ai(tool_calls, trigger_signal)
@@ -116,14 +120,26 @@ def preprocess_messages(messages: List[Dict[str, Any]], trigger_signal: str, con
                     processed_message = message.copy()
                     processed_message["role"] = "system"
                     processed_messages.append(processed_message)
-                    logger.debug(f"🔧 Converted developer message to system message for better upstream compatibility")
+                    logger.debug(f"🔧 Message #{idx}: Converted developer → system")
                 else:
                     processed_messages.append(message)
-                    logger.debug(f"🔧 Keeping developer role unchanged (based on configuration)")
+                    logger.debug(f"🔧 Message #{idx}: Keeping developer role unchanged")
             else:
+                role = message.get("role", "unknown")
                 processed_messages.append(message)
+                logger.debug(f"🔧 Message #{idx}: role={role}, kept unchanged")
         else:
             processed_messages.append(message)
+            logger.debug(f"🔧 Message #{idx}: Non-dict message, kept unchanged")
+    
+    logger.info(f"✅ Message preprocessing completed: {len(messages)} → {len(processed_messages)} messages")
+    
+    # 验证没有 tool role 残留
+    tool_msgs = [m for m in processed_messages if isinstance(m, dict) and m.get("role") == "tool"]
+    if tool_msgs:
+        logger.error(f"❌ WARNING: Found {len(tool_msgs)} unconverted tool messages after preprocessing!")
+        for i, msg in enumerate(tool_msgs):
+            logger.error(f"   Tool message {i}: {msg.get('tool_call_id', 'no-id')}")
     
     return processed_messages
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Toolify Admin
+# 🚀 Toolify-code
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -35,7 +35,7 @@
 
 ## 📖 简介
 
-**Toolify Admin** 是一个强大的 LLM 函数调用中间件代理，专为企业级应用设计。它通过 **Prompt Injection** 技术为不支持原生函数调用的大型语言模型注入 OpenAI 兼容的函数调用能力，同时提供现代化的 Web 管理界面实现配置的可视化管理。
+**Toolify-code** 是一个强大的 LLM 函数调用中间件代理，专为企业级应用设计。它通过 **Prompt Injection** 技术为不支持原生函数调用的大型语言模型注入 OpenAI 兼容的函数调用能力，同时提供现代化的 Web 管理界面实现配置的可视化管理。
 
 ## ✨ 核心特性
 
@@ -705,6 +705,38 @@ cd ..
 
 ---
 
+## 📝 配置示例
+
+### 按服务控制函数调用
+
+```yaml
+upstream_services:
+  - name: "openai-with-injection"
+    inject_function_calling: true    # 启用 Toolify 注入
+    optimize_prompt: true             # 使用优化 prompt
+    
+  - name: "openai-native"
+    inject_function_calling: false   # 使用原生函数调用 API
+```
+
+### 模型重定向
+
+```yaml
+upstream_services:
+  - name: "openai"
+    model_mapping:
+      gpt-4: gpt-4o           # 客户端请求 gpt-4 → 实际使用 gpt-4o
+      gpt-3.5: gpt-4o-mini    # 客户端请求 gpt-3.5 → 实际使用 gpt-4o-mini
+      claude-2: claude-3      # 支持任意模型名
+```
+
+### Prompt 优化效果
+
+启用优化模式后，函数调用 prompt 大幅精简：
+- **详细模式**（默认）：50,679 字符，约 12,669 tokens（17个工具）
+- **优化模式**：约 15,000 字符，约 4,000 tokens（17个工具）
+- **节省**：减少 60-70% 的 prompt tokens ✅
+
 ## 📄 许可证
 
 本项目采用 **GPL-3.0-or-later** 许可证。
@@ -721,8 +753,8 @@ cd ..
 
 <div align="center">
 
-**Made with ❤️ by Toolify Admin Team**
+**Made with ❤️ by Toolify-code Team**
 
-[GitHub](https://github.com/ImogeneOctaviap794/Toolify) • [Issues](https://github.com/ImogeneOctaviap794/Toolify/issues) • [原项目](https://github.com/funnycups/toolify)
+[GitHub](https://github.com/ImogeneOctaviap794/Toolify-code) • [Issues](https://github.com/ImogeneOctaviap794/Toolify-code/issues) • [原项目](https://github.com/funnycups/toolify)
 
 </div>

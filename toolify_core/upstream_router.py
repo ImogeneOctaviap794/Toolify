@@ -84,6 +84,18 @@ def find_upstream(
          parts = chosen_model_entry.split(':', 1)
          if len(parts) == 2:
              _, actual_model_name = parts
+    
+    # Check for model_mapping redirect
+    if services and services[0].get('model_mapping'):
+        model_mapping = services[0]['model_mapping']
+        if model_name in model_mapping:
+            redirected_model = model_mapping[model_name]
+            logger.info(f"🔄 Model redirect: {model_name} → {redirected_model}")
+            actual_model_name = redirected_model
+        elif actual_model_name in model_mapping:
+            redirected_model = model_mapping[actual_model_name]
+            logger.info(f"🔄 Model redirect: {actual_model_name} → {redirected_model}")
+            actual_model_name = redirected_model
             
     return services, actual_model_name
 

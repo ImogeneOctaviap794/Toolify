@@ -316,23 +316,56 @@ async def chat_completions(
     if has_function_call:
         logger.debug(f"🔧 Using global trigger signal for this request: {GLOBAL_TRIGGER_SIGNAL}")
         
-        function_prompt, _ = generate_function_prompt(
-            body.tools,
-            GLOBAL_TRIGGER_SIGNAL,
-            app_config.features.prompt_template
-        )
+        # Check if function calling injection is enabled for this upstream
+        upstream_fc_enabled = upstreams[0].get('inject_function_calling')
+        if upstream_fc_enabled is None:
+            # Inherit from global setting
+            upstream_fc_enabled = app_config.features.enable_function_calling
         
-        tool_choice_prompt = safe_process_tool_choice(body.tool_choice)
-        if tool_choice_prompt:
-            function_prompt += tool_choice_prompt
+        if not upstream_fc_enabled:
+            logger.info(f"🔧 Function calling injection disabled for upstream '{upstreams[0]['name']}', passing through tools to native API")
+            # Don't inject, let upstream handle tools natively
+            has_function_call = False
+        else:
+            # Get optimization setting for this upstream
+            optimize_prompt = upstreams[0].get('optimize_prompt', False)
+            
+            function_prompt, _ = generate_function_prompt(
+                body.tools,
+                GLOBAL_TRIGGER_SIGNAL,
+                app_config.features.prompt_template,
+                optimize=optimize_prompt
+            )
+            
+            tool_choice_prompt = safe_process_tool_choice(body.tool_choice)
+            if tool_choice_prompt:
+                function_prompt += tool_choice_prompt
 
-        system_message = {"role": "system", "content": function_prompt}
-        request_body_dict["messages"].insert(0, system_message)
-        
-        if "tools" in request_body_dict:
-            del request_body_dict["tools"]
-        if "tool_choice" in request_body_dict:
-            del request_body_dict["tool_choice"]
+            # 打印 prompt 大小信息
+            prompt_chars = len(function_prompt)
+            estimated_tokens = prompt_chars // 4  # 粗略估算
+            logger.info("=" * 80)
+            logger.info(f"📏 Function Calling Prompt Size:")
+            logger.info(f"   Upstream: {upstreams[0]['name']}")
+            logger.info(f"   Optimization: {'✅ ENABLED' if optimize_prompt else '❌ DISABLED'}")
+            logger.info(f"   Tools count: {len(body.tools)}")
+            logger.info(f"   Prompt characters: {prompt_chars:,}")
+            logger.info(f"   Estimated tokens: ~{estimated_tokens:,}")
+            logger.info(f"   Original messages: {len(body.messages)}")
+            logger.info("=" * 80)
+
+            system_message = {"role": "system", "content": function_prompt}
+            request_body_dict["messages"].insert(0, system_message)
+            
+            # 计算注入后的总大小
+            total_chars = sum(len(str(m.get('content', ''))) for m in request_body_dict["messages"])
+            logger.info(f"📏 Total request size after injection: {total_chars:,} characters (~{total_chars//4:,} tokens)")
+            logger.info(f"📏 Total messages after injection: {len(request_body_dict['messages'])}")
+            
+            if "tools" in request_body_dict:
+                del request_body_dict["tools"]
+            if "tool_choice" in request_body_dict:
+                del request_body_dict["tool_choice"]
 
     elif has_tools_in_request and not is_fc_enabled:
         logger.info(f"🔧 Function calling is disabled by configuration, ignoring 'tools' and 'tool_choice' in request.")
@@ -717,10 +750,45 @@ async def anthropic_messages(
         logger.debug(f"🔄 Converted Anthropic request to OpenAI format")
         logger.debug(f"🔧 OpenAI messages: {len(openai_request['messages'])}")
         
+        # Check for tool role messages
+        tool_role_msgs = [m for m in openai_request['messages'] if isinstance(m, dict) and m.get('role') == 'tool']
+        if tool_role_msgs:
+            logger.warning(f"⚠️ Found {len(tool_role_msgs)} messages with 'tool' role after conversion from Anthropic")
+            for i, msg in enumerate(tool_role_msgs):
+                logger.warning(f"   Tool message {i}: tool_call_id={msg.get('tool_call_id', 'N/A')}")
+        
+        # Preprocess messages to handle tool role (upstream may not support it)
+        logger.debug(f"🔧 Starting message preprocessing for Anthropic API")
+        openai_request['messages'] = preprocess_messages(
+            openai_request['messages'],
+            GLOBAL_TRIGGER_SIGNAL,
+            app_config.features.convert_developer_to_system
+        )
+        logger.debug(f"🔧 After preprocessing: {len(openai_request['messages'])} messages")
+        
+        # Find upstream service first
+        upstreams, actual_model = find_upstream(
+            body.model,
+            MODEL_TO_SERVICE_MAPPING,
+            ALIAS_MAPPING,
+            DEFAULT_SERVICE,
+            app_config.features.model_passthrough,
+            app_config.upstream_services
+        )
+        upstream = upstreams[0]  # Use highest priority upstream
+        
+        logger.info(f"🎯 Using upstream: {upstream['name']} (priority: {upstream.get('priority', 0)})")
+        
         # Apply Toolify's function calling logic if tools are present
         has_tools = "tools" in openai_request and openai_request["tools"]
-        is_fc_enabled = app_config.features.enable_function_calling
-        has_function_call = is_fc_enabled and has_tools
+        
+        # Check if function calling is enabled for this upstream
+        upstream_fc_enabled = upstream.get('inject_function_calling')
+        if upstream_fc_enabled is None:
+            # Inherit from global setting
+            upstream_fc_enabled = app_config.features.enable_function_calling
+        
+        has_function_call = upstream_fc_enabled and has_tools
         
         if has_function_call:
             logger.info(f"🔧 Applying Toolify function calling injection for {len(openai_request['tools'])} tools")
@@ -744,38 +812,47 @@ async def anthropic_messages(
                     logger.warning(f"⚠️  Failed to parse tool: {e}")
             
             if tool_objects:
+                # Get optimization setting for this upstream
+                optimize_prompt = upstream.get('optimize_prompt', False)
+                
                 # Generate function calling prompt
                 function_prompt, _ = generate_function_prompt(
                     tool_objects,
                     GLOBAL_TRIGGER_SIGNAL,
-                    app_config.features.prompt_template
+                    app_config.features.prompt_template,
+                    optimize=optimize_prompt
                 )
+                
+                # 打印 Anthropic API 的 prompt 大小信息
+                prompt_chars = len(function_prompt)
+                estimated_tokens = prompt_chars // 4
+                logger.info("=" * 80)
+                logger.info(f"📏 Anthropic API - Function Calling Prompt Size:")
+                logger.info(f"   Optimization: {'✅ ENABLED' if optimize_prompt else '❌ DISABLED'}")
+                logger.info(f"   Tools count: {len(tool_objects)}")
+                logger.info(f"   Prompt characters: {prompt_chars:,}")
+                logger.info(f"   Estimated tokens: ~{estimated_tokens:,}")
+                logger.info(f"   Original messages: {len(openai_request['messages'])}")
+                logger.info("=" * 80)
                 
                 # Inject into system message
                 system_message = {"role": "system", "content": function_prompt}
                 openai_request["messages"].insert(0, system_message)
                 
+                # 计算注入后的总大小
+                total_chars = sum(len(str(m.get('content', ''))) for m in openai_request["messages"])
+                logger.info(f"📏 Total request size after injection: {total_chars:,} characters (~{total_chars//4:,} tokens)")
+                logger.info(f"📏 Total messages after injection: {len(openai_request['messages'])}")
+                
                 logger.debug(f"🔧 Injected function calling prompt with trigger signal")
-            
-            # Remove tools parameter (we're using prompt injection instead)
-            del openai_request["tools"]
+                
+                # Remove tools parameter (we're using prompt injection instead)
+                if "tools" in openai_request:
+                    del openai_request["tools"]
         
-        elif has_tools and not is_fc_enabled:
-            logger.info(f"🔧 Function calling is disabled, removing tools from request")
-            del openai_request["tools"]
-        
-        # Find upstream service
-        upstreams, actual_model = find_upstream(
-            body.model,
-            MODEL_TO_SERVICE_MAPPING,
-            ALIAS_MAPPING,
-            DEFAULT_SERVICE,
-            app_config.features.model_passthrough,
-            app_config.upstream_services
-        )
-        upstream = upstreams[0]  # Use highest priority upstream
-        
-        logger.info(f"🎯 Using upstream: {upstream['name']} (priority: {upstream.get('priority', 0)})")
+        elif has_tools and not upstream_fc_enabled:
+            logger.info(f"🔧 Function calling injection disabled for upstream '{upstream['name']}', passing through tools to native API")
+            # Keep tools in request for native API handling
         
         # Update model to actual upstream model
         openai_request["model"] = actual_model
@@ -795,6 +872,8 @@ async def anthropic_messages(
             
             async def anthropic_stream_generator():
                 try:
+                    logger.debug(f"🔧 Anthropic stream generator started, has_function_call={has_function_call}")
+                    
                     # If function calling is enabled, use the special streaming handler
                     if has_function_call:
                         logger.debug(f"🔧 Using function calling streaming handler")
@@ -810,22 +889,41 @@ async def anthropic_messages(
                             app_config.server.timeout
                         )
                         # Convert to Anthropic format
+                        chunk_count = 0
                         async for anthropic_chunk in stream_openai_to_anthropic(openai_stream):
+                            chunk_count += 1
+                            if chunk_count <= 5 or chunk_count % 50 == 0:  # Log first 5 and every 50th chunk
+                                logger.debug(f"🔧 Yielding Anthropic chunk #{chunk_count}, type: {type(anthropic_chunk)}, size: {len(anthropic_chunk) if isinstance(anthropic_chunk, (str, bytes)) else 'N/A'}")
                             yield anthropic_chunk.encode('utf-8') if isinstance(anthropic_chunk, str) else anthropic_chunk
+                        logger.debug(f"🔧 Function calling stream completed, total chunks: {chunk_count}")
                     else:
+                        logger.debug(f"🔧 Using direct streaming (no function calling)")
                         # No function calling, direct streaming
                         async with http_client.stream("POST", upstream_url, json=openai_request, headers=headers, timeout=app_config.server.timeout) as response:
+                            logger.debug(f"🔧 Upstream response status: {response.status_code}")
+                            logger.debug(f"🔧 Upstream response headers: {dict(response.headers)}")
+                            
                             if response.status_code != 200:
                                 error_content = await response.aread()
                                 logger.error(f"❌ Upstream error: {response.status_code} - {error_content.decode('utf-8', errors='ignore')}")
                                 yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': {'type': 'api_error', 'message': 'Upstream service error'}})}\n\n"
                                 return
                             
+                            chunk_count = 0
                             async for converted_chunk in stream_openai_to_anthropic(response.aiter_bytes()):
+                                chunk_count += 1
+                                if chunk_count <= 5 or chunk_count % 50 == 0:
+                                    logger.debug(f"🔧 Yielding direct chunk #{chunk_count}")
                                 yield converted_chunk.encode('utf-8') if isinstance(converted_chunk, str) else converted_chunk
+                            logger.debug(f"🔧 Direct stream completed, total chunks: {chunk_count}")
                             
+                except httpx.RemoteProtocolError as e:
+                    logger.error(f"❌ Remote protocol error: {e}")
+                    logger.error(f"❌ This usually means the upstream closed the connection prematurely")
+                    logger.error(traceback.format_exc())
+                    yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': {'type': 'api_error', 'message': 'Connection closed by upstream'}})}\n\n"
                 except Exception as e:
-                    logger.error(f"❌ Streaming error: {e}")
+                    logger.error(f"❌ Streaming error: {type(e).__name__}: {e}")
                     logger.error(traceback.format_exc())
                     yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': {'type': 'api_error', 'message': str(e)}})}\n\n"
             
