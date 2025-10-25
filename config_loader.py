@@ -28,7 +28,6 @@ class UpstreamService(BaseModel):
     is_default: bool = Field(default=False, description="Is default service (deprecated, use priority instead)")
     priority: int = Field(default=0, description="Priority level (higher number = higher priority)")
     inject_function_calling: Optional[bool] = Field(default=None, description="Enable function calling injection for this service (None = inherit from global setting)")
-    optimize_prompt: bool = Field(default=False, description="Optimize prompt to reduce token usage for this service")
     
     @field_validator('base_url')
     def validate_base_url(cls, v):

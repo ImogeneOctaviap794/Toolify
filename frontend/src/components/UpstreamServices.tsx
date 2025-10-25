@@ -28,7 +28,6 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
       is_default: false,
       priority: config.upstream_services.length * 10,
       inject_function_calling: null,  // null = inherit from global
-      optimize_prompt: false,
       model_mapping: {},
       models: []
     }
@@ -476,20 +475,6 @@ export default function UpstreamServices({ config, setConfig }: UpstreamServices
                         <Label className="font-medium text-blue-900">🎆 启用函数调用注入</Label>
                         <p className="text-xs text-blue-600 mt-0.5">为此服务注入 Toolify 能力</p>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2 p-3 rounded-lg bg-gradient-to-r from-cyan-50 to-sky-50 border border-cyan-200">
-                    <Switch
-                      checked={service.optimize_prompt === true}
-                      onCheckedChange={(checked) => updateService(index, 'optimize_prompt', checked)}
-                      className="data-[state=checked]:bg-cyan-500"
-                    />
-                    <div className="flex-1">
-                      <Label className="font-medium text-cyan-900">⚡ Prompt 优化模式</Label>
-                      <p className="text-xs text-cyan-700 mt-0.5">
-                        生成精简版提示词，减少 50-70% Token 用量（推荐 10+ 工具时启用）
-                      </p>
                     </div>
                   </div>
                 </div>

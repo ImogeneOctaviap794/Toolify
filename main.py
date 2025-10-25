@@ -327,14 +327,10 @@ async def chat_completions(
             # Don't inject, let upstream handle tools natively
             has_function_call = False
         else:
-            # Get optimization setting for this upstream
-            optimize_prompt = upstreams[0].get('optimize_prompt', False)
-            
             function_prompt, _ = generate_function_prompt(
                 body.tools,
                 GLOBAL_TRIGGER_SIGNAL,
-                app_config.features.prompt_template,
-                optimize=optimize_prompt
+                app_config.features.prompt_template
             )
             
             tool_choice_prompt = safe_process_tool_choice(body.tool_choice)
@@ -347,7 +343,6 @@ async def chat_completions(
             logger.info("=" * 80)
             logger.info(f"📏 Function Calling Prompt Size:")
             logger.info(f"   Upstream: {upstreams[0]['name']}")
-            logger.info(f"   Optimization: {'✅ ENABLED' if optimize_prompt else '❌ DISABLED'}")
             logger.info(f"   Tools count: {len(body.tools)}")
             logger.info(f"   Prompt characters: {prompt_chars:,}")
             logger.info(f"   Estimated tokens: ~{estimated_tokens:,}")
@@ -812,15 +807,11 @@ async def anthropic_messages(
                     logger.warning(f"⚠️  Failed to parse tool: {e}")
             
             if tool_objects:
-                # Get optimization setting for this upstream
-                optimize_prompt = upstream.get('optimize_prompt', False)
-                
                 # Generate function calling prompt
                 function_prompt, _ = generate_function_prompt(
                     tool_objects,
                     GLOBAL_TRIGGER_SIGNAL,
-                    app_config.features.prompt_template,
-                    optimize=optimize_prompt
+                    app_config.features.prompt_template
                 )
                 
                 # 打印 Anthropic API 的 prompt 大小信息
@@ -828,7 +819,6 @@ async def anthropic_messages(
                 estimated_tokens = prompt_chars // 4
                 logger.info("=" * 80)
                 logger.info(f"📏 Anthropic API - Function Calling Prompt Size:")
-                logger.info(f"   Optimization: {'✅ ENABLED' if optimize_prompt else '❌ DISABLED'}")
                 logger.info(f"   Tools count: {len(tool_objects)}")
                 logger.info(f"   Prompt characters: {prompt_chars:,}")
                 logger.info(f"   Estimated tokens: ~{estimated_tokens:,}")

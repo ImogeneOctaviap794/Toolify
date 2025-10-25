@@ -17,7 +17,6 @@ upstream_services:
     is_default: true  # Deprecated field, use priority instead
     priority: 100  # Priority level (higher number = higher priority)
     inject_function_calling: null  # null = inherit from global setting, true = force enable, false = force disable
-    optimize_prompt: false  # Optimize prompt to reduce token usage (recommended for 10+ tools)
     model_mapping: {}  # Model redirect: client request model -> actual upstream model (e.g., gpt-4: gpt-4o)
     models:
       - "gpt-3.5-turbo"
