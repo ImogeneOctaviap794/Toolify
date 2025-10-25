@@ -400,6 +400,17 @@ async def chat_completions(
                 
                 # 添加响应内容检查，防止空响应或非JSON响应
                 response_text = upstream_response.text
+                print(f"\n{'='*80}")
+                print(f"🔍 UPSTREAM NON-STREAMING RESPONSE")
+                print(f"{'='*80}")
+                print(f"Status: {upstream_response.status_code}")
+                print(f"Headers: {dict(upstream_response.headers)}")
+                print(f"Body length: {len(response_text)} bytes")
+                print(f"Body (first 1000 chars):\n{response_text[:1000]}")
+                if len(response_text) > 1000:
+                    print(f"... (total {len(response_text)} bytes)")
+                print(f"{'='*80}\n")
+                
                 logger.debug(f"🔧 Upstream response status code: {upstream_response.status_code}")
                 logger.debug(f"🔧 Upstream response length: {len(response_text)} bytes")
 

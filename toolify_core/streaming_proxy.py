@@ -87,8 +87,16 @@ async def stream_proxy_with_fc_transform(
 
     try:
         async with http_client.stream("POST", url, json=body, headers=headers, timeout=timeout) as response:
+            print(f"\n{'='*80}")
+            print(f"🔍 UPSTREAM STREAMING RESPONSE")
+            print(f"{'='*80}")
+            print(f"Status: {response.status_code}")
+            print(f"Headers: {dict(response.headers)}")
+            print(f"{'='*80}\n")
+            
             if response.status_code != 200:
                 error_content = await response.aread()
+                print(f"❌ Error content: {error_content.decode('utf-8', errors='ignore')}")
                 logger.error(f"❌ Upstream service stream response error: status_code={response.status_code}")
                 logger.error(f"❌ Upstream error details: {error_content.decode('utf-8', errors='ignore')}")
                 
@@ -108,7 +116,12 @@ async def stream_proxy_with_fc_transform(
                 yield b"data: [DONE]\n\n"
                 return
 
+            line_count = 0
             async for line in response.aiter_lines():
+                line_count += 1
+                if line_count <= 10:  # 打印前10行
+                    print(f"📥 Upstream line #{line_count}: {line[:200] if len(line) > 200 else line}")
+                
                 if detector.state == "tool_parsing":
                     if line.startswith("data:"):
                         line_data = line[len("data: "):].strip()
